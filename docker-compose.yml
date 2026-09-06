@@ -1,0 +1,86 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sitti-postgres
+    environment:
+      POSTGRES_USER: sitti_user
+      POSTGRES_PASSWORD: sitti_password
+      POSTGRES_DB: sitti_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sitti_user -d sitti_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sitti-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sitti-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - sitti-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+      target: development
+    container_name: sitti-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "postgresql://sitti_user:sitti_password@postgres:5432/sitti_db"
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app/backend
+      - /app/backend/node_modules
+    working_dir: /app/backend
+    command: sh -c "npm install && npx prisma generate && npx prisma migrate deploy && npm run db:seed && npm run dev"
+    networks:
+      - sitti-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: development-dependencies-env
+    container_name: sitti-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./app:/app/app
+      - ./public:/app/public
+      - ./react-router.config.ts:/app/react-router.config.ts
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./tsconfig.json:/app/tsconfig.json
+      - /app/node_modules
+    working_dir: /app
+    command: npm run dev
+    networks:
+      - sitti-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  sitti-network:
+    driver: bridge

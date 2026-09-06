@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// CATÁLOGOS
+// ============================================
+
+model Rol {
+  id_rol   Int       @id @default(autoincrement())
+  nombre   String    @unique
+  usuarios Usuario[]
+
+  @@map("roles")
+}
+
+model Area {
+  id_area    Int       @id @default(autoincrement())
+  nombre     String    @unique
+  activo     Boolean   @default(true)
+  usuarios   Usuario[]
+  tickets    Ticket[]
+
+  @@map("areas")
+}
+
+model Categoria {
+  id_categoria Int      @id @default(autoincrement())
+  nombre       String   @unique
+  descripcion  String?
+  activo       Boolean  @default(true)
+  tickets      Ticket[]
+
+  @@map("categorias")
+}
+
+model Prioridad {
+  id_prioridad Int      @id @default(autoincrement())
+  nombre       String   @unique
+  tickets      Ticket[]
+
+  @@map("prioridades")
+}
+
+model Estado {
+  id_estado Int      @id @default(autoincrement())
+  nombre    String   @unique
+  tickets   Ticket[]
+
+  @@map("estados")
+}
+
+// ============================================
+// ENTIDADES PRINCIPALES
+// ============================================
+
+model Usuario {
+  id_usuario       Int                @id @default(autoincrement())
+  id_rol           Int
+  id_area          Int
+  nombre           String
+  correo           String             @unique
+  password_hash    String
+  activo           Boolean            @default(true)
+  creado_en        DateTime           @default(now())
+  
+  rol              Rol                @relation(fields: [id_rol], references: [id_rol], onDelete: Restrict)
+  area             Area               @relation(fields: [id_area], references: [id_area], onDelete: Restrict)
+  
+  // Tickets donde es solicitante
+  ticketsSolicitados Ticket[]         @relation("solicitante")
+  
+  // Tickets donde es responsable
+  ticketsResponsables Ticket[]        @relation("responsable")
+  
+  // Comentarios del usuario
+  comentarios      Comentario[]
+  
+  // Adjuntos subidos por usuario
+  adjuntos         Adjunto[]
+  
+  // Cambios registrados en historial
+  historialTickets HistorialTicket[]
+
+  @@index([id_rol])
+  @@index([id_area])
+  @@index([correo])
+  @@map("usuarios")
+}
+
+model Ticket {
+  id_ticket         Int               @id @default(autoincrement())
+  folio             String            @unique
+  id_solicitante    Int
+  id_responsable    Int?
+  id_area           Int
+  id_categoria      Int
+  id_prioridad      Int
+  id_estado         Int
+  titulo            String
+  descripcion       String
+  fecha_creacion    DateTime          @default(now())
+  fecha_actualizacion DateTime        @updatedAt
+  fecha_cierre      DateTime?
+  
+  solicitante       Usuario           @relation("solicitante", fields: [id_solicitante], references: [id_usuario], onDelete: Restrict)
+  responsable       Usuario?          @relation("responsable", fields: [id_responsable], references: [id_usuario], onDelete: SetNull)
+  area              Area              @relation(fields: [id_area], references: [id_area], onDelete: Restrict)
+  categoria         Categoria         @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict)
+  prioridad         Prioridad         @relation(fields: [id_prioridad], references: [id_prioridad], onDelete: Restrict)
+  estado            Estado            @relation(fields: [id_estado], references: [id_estado], onDelete: Restrict)
+  
+  comentarios       Comentario[]
+  adjuntos          Adjunto[]
+  historial         HistorialTicket[]
+
+  @@index([id_solicitante])
+  @@index([id_responsable])
+  @@index([id_area])
+  @@index([id_categoria])
+  @@index([id_prioridad])
+  @@index([id_estado])
+  @@index([folio])
+  @@map("tickets")
+}
+
+model Comentario {
+  id_comentario Int       @id @default(autoincrement())
+  id_ticket     Int
+  id_usuario    Int
+  comentario    String
+  fecha         DateTime  @default(now())
+  
+  ticket        Ticket    @relation(fields: [id_ticket], references: [id_ticket], onDelete: Cascade)
+  usuario       Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+
+  @@index([id_ticket])
+  @@index([id_usuario])
+  @@map("comentarios")
+}
+
+model Adjunto {
+  id_adjunto      Int       @id @default(autoincrement())
+  id_ticket       Int
+  id_usuario      Int
+  nombre_archivo  String
+  ruta_archivo    String
+  tipo_mime       String
+  fecha           DateTime  @default(now())
+  
+  ticket          Ticket    @relation(fields: [id_ticket], references: [id_ticket], onDelete: Cascade)
+  usuario         Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+
+  @@index([id_ticket])
+  @@index([id_usuario])
+  @@map("adjuntos")
+}
+
+model HistorialTicket {
+  id_historial   Int       @id @default(autoincrement())
+  id_ticket      Int
+  id_usuario     Int
+  accion         String
+  valor_anterior String?
+  valor_nuevo    String?
+  fecha          DateTime  @default(now())
+  
+  ticket         Ticket    @relation(fields: [id_ticket], references: [id_ticket], onDelete: Cascade)
+  usuario        Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+
+  @@index([id_ticket])
+  @@index([id_usuario])
+  @@map("historial_tickets")
+}
