@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { RegisterSchema, LoginSchema } from '../validators/auth.schema.js';
 import { registerUser, loginUser, getUserById } from '../services/auth.service.js';
 

@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import prisma from '../config/database.js';
 

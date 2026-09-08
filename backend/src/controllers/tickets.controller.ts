@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { getTickets, getTicketById, createTicket, updateTicket, deleteTicket } from '../services/tickets.service.js';
 import prisma from '../config/database.js';
 

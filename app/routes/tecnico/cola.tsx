@@ -55,6 +55,7 @@ export default function TicketQueue() {
   }, [user]);
 
   const handleTakeTicket = async (ticketId: number) => {
+    if (!user) return;
     try {
       setLoadingId(ticketId);
       // Cambiar estado a EN_PROCESO (id 3) y asignar al técnico actual

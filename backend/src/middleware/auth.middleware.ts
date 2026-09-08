@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { verifyToken as verifyJWTToken } from '../utils/jwt.js';
 
 declare global {

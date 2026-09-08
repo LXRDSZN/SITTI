@@ -4,12 +4,14 @@ import { useLocation, useNavigate } from "react-router";
 import { getNavigation, type RoleNavConfig } from "./navigation.config";
 import { Link } from "react-router";
 import { Button } from "../common/Button";
+import { useNotificationBadge } from "../../hooks/useNotificationBadge";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const { unreadCount } = useNotificationBadge();
 
   if (!user) {
     return <>{children}</>;
@@ -87,13 +89,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <li key={item.href}>
                     <Link
                       to={item.href}
-                      className={`block px-4 py-2 rounded-lg transition-colors ${
+                      className={`flex items-center justify-between px-4 py-2 rounded-lg transition-colors ${
                         isActive(item.href)
                           ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium"
                           : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
                     >
-                      {item.label}
+                      <span>{item.label}</span>
+                      {item.label === "Notificaciones" && unreadCount > 0 && (
+                        <span className="inline-flex items-center justify-center w-6 h-6 ml-2 text-xs font-bold text-white bg-red-600 rounded-full">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 ))}

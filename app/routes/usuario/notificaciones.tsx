@@ -2,6 +2,7 @@ import type { Route } from "./+types/notificaciones";
 import { Card } from "../../components/common/Card";
 import { useAuth } from "../../context/AuthContext";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { notificationsService, type Notification } from "../../services/notifications.service";
 import { Toast } from "../../components/common/Alert";
 
@@ -11,6 +12,7 @@ export const meta: Route.MetaFunction = () => {
 
 export default function Notifications() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,15 @@ export default function Notifications() {
       );
     } catch (err: any) {
       console.error("Error marking as read:", err);
+    }
+  };
+
+  const handleNotificationClick = async (notif: Notification) => {
+    if (!notif.leido) {
+      await handleMarkAsRead(notif.id_notificacion);
+    }
+    if (notif.ticket?.id_ticket) {
+      navigate(`/usuario/tickets/${notif.ticket.id_ticket}`);
     }
   };
 
@@ -164,7 +175,7 @@ export default function Notifications() {
             <Card
               key={notif.id_notificacion}
               className={`border-l-4 ${getNotificationColor(notif.tipo)} cursor-pointer hover:shadow-md transition-shadow`}
-              onClick={() => handleMarkAsRead(notif.id_notificacion)}
+              onClick={() => handleNotificationClick(notif)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -173,7 +184,7 @@ export default function Notifications() {
                       {notif.titulo}
                     </h3>
                     {!notif.leido && (
-                      <span className="w-3 h-3 bg-blue-600 rounded-full" />
+                      <span className="w-3 h-3 bg-blue-600 rounded-full" title="No leída" />
                     )}
                   </div>
                   <p className="text-gray-600 dark:text-gray-400 mt-2">
@@ -181,7 +192,7 @@ export default function Notifications() {
                   </p>
                   {notif.ticket && (
                     <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                      Ticket: <span className="font-mono">{notif.ticket.folio}</span>
+                      Ticket: <span className="font-mono underline text-blue-600 dark:text-blue-400">{notif.ticket.folio}</span>
                     </p>
                   )}
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">

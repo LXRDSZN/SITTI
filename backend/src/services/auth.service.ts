@@ -1,7 +1,7 @@
 import prisma from '../config/database.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 import { generateToken } from '../utils/jwt.js';
-import { RegisterInput, LoginInput } from '../validators/auth.schema.js';
+import type { RegisterInput, LoginInput } from '../validators/auth.schema.js';
 
 export const registerUser = async (input: RegisterInput) => {
   const { nombre, correo, password, id_rol, id_area } = input;

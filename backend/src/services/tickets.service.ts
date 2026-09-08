@@ -4,11 +4,13 @@ import { createNotification } from '../controllers/notifications.controller.js';
 export const getTickets = async (rol?: string, id_usuario?: number, id_area?: number) => {
   const where: any = {};
 
+  const rolNormalized = rol ? rol.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+
   // Filtrar según el rol
-  if (rol === 'usuario' && id_usuario) {
+  if (rolNormalized === 'usuario' && id_usuario) {
     // Usuario solo ve sus propios tickets
     where.id_solicitante = id_usuario;
-  } else if (rol === 'técnico' && id_area) {
+  } else if (rolNormalized === 'tecnico' && id_area) {
     // Técnico ve tickets de su área
     where.id_area = id_area;
   }
@@ -94,6 +96,34 @@ export const createTicket = async (data: {
       estado: true,
     },
   });
+
+  // Crear notificaciones para todos los técnicos activos
+  try {
+    const tecnicos = await prisma.usuario.findMany({
+      where: {
+        rol: {
+          nombre: {
+            in: ['Técnico', 'técnico', 'Tecnico', 'tecnico', 'TÉCNICO', 'TECNICO'],
+            mode: 'insensitive',
+          },
+        },
+        activo: true,
+      },
+      select: { id_usuario: true },
+    });
+
+    for (const tecnico of tecnicos) {
+      await createNotification(
+        tecnico.id_usuario,
+        ticket.id_ticket,
+        `📌 Nuevo ticket en ${ticket.area.nombre}`,
+        `El usuario ${ticket.solicitante.nombre} ha creado el ticket ${ticket.folio}: "${ticket.titulo}"`,
+        'ticket_creado'
+      );
+    }
+  } catch (error) {
+    console.error('Error creating technician notifications:', error);
+  }
 
   return ticket;
 };
