@@ -40,6 +40,7 @@ export const registerUser = async (input: RegisterInput) => {
       nombre: usuario.nombre,
       correo: usuario.correo,
       rol: usuario.rol.nombre,
+      id_area: usuario.id_area,
       area: usuario.area.nombre,
     },
   };
@@ -78,6 +79,7 @@ export const loginUser = async (input: LoginInput) => {
       nombre: usuario.nombre,
       correo: usuario.correo,
       rol: usuario.rol.nombre,
+      id_area: usuario.id_area,
       area: usuario.area.nombre,
     },
   };
@@ -101,6 +103,7 @@ export const getUserById = async (id_usuario: number) => {
     nombre: usuario.nombre,
     correo: usuario.correo,
     rol: usuario.rol.nombre,
+    id_area: usuario.id_area,
     area: usuario.area.nombre,
   };
 };

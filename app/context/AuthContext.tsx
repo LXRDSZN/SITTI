@@ -47,6 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: usuario.correo,
         role: usuario.rol.toLowerCase() as any,
         department: usuario.area,
+        area: usuario.area,
+        id_area: usuario.id_area,
       };
 
       setAuthState({
@@ -78,6 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: resultado.usuario.correo,
         role: resultado.usuario.rol.toLowerCase() as any,
         department: resultado.usuario.area,
+        area: resultado.usuario.area,
+        id_area: resultado.usuario.id_area,
       };
 
       setAuthState({

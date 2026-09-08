@@ -3,6 +3,8 @@ import cors from 'cors';
 import { env } from './config/env.js';
 import authRoutes from './routes/auth.routes.js';
 import ticketsRoutes from './routes/tickets.routes.js';
+import comentariosRoutes from './routes/comentarios.routes.js';
+import notificationsRoutes from './routes/notifications.routes.js';
 
 const app = express();
 
@@ -38,5 +40,7 @@ app.get('/', (req, res) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/tickets', ticketsRoutes);
+app.use('/api/comentarios', comentariosRoutes);
+app.use('/api/notificaciones', notificationsRoutes);
 
 export default app;

@@ -7,6 +7,8 @@ export interface User {
   role: UserRole;
   avatar?: string;
   department?: string;
+  area?: string;
+  id_area?: number;
   phone?: string;
 }
 

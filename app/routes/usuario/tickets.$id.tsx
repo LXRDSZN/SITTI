@@ -1,10 +1,12 @@
 import type { Route } from "./+types/tickets.\$id";
-import { mockTickets } from "../../utils/mockData";
 import { useAuth } from "../../context/AuthContext";
 import { Card, CardTitle } from "../../components/common/Card";
 import { StatusBadge, PriorityBadge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
-import { useState } from "react";
+import { Alert } from "../../components/common/Alert";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { ticketsService, type Ticket } from "../../services/tickets.service";
 
 export const meta: Route.MetaFunction = ({ params }) => {
   return [{ title: `Ticket ${params.id} - SITTI` }];
@@ -12,13 +14,51 @@ export const meta: Route.MetaFunction = ({ params }) => {
 
 export default function TicketDetail({ params }: Route.ComponentProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [comment, setComment] = useState("");
-  const ticket = mockTickets.find((t) => t.id === params.id);
 
-  if (!ticket || !user) {
+  useEffect(() => {
+    const fetchTicket = async () => {
+      try {
+        setLoading(true);
+        const response = await ticketsService.getTicketById(parseInt(params.id));
+        setTicket(response.ticket);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al cargar el ticket");
+        setTicket(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchTicket();
+    }
+  }, [params.id, user]);
+
+  if (loading) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600 dark:text-gray-400">Ticket no encontrado</p>
+        <p className="text-gray-600 dark:text-gray-400">Cargando ticket...</p>
+      </div>
+    );
+  }
+
+  if (error || !ticket) {
+    return (
+      <div className="space-y-4">
+        <Alert
+          type="error"
+          title="Error"
+          message={error || "Ticket no encontrado"}
+        />
+        <Button onClick={() => navigate("/usuario/tickets")}>
+          Volver a Mis Tickets
+        </Button>
       </div>
     );
   }
@@ -28,12 +68,37 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          {ticket.title}
+          {ticket.titulo}
         </h1>
         <div className="flex gap-3 mb-4">
-          <StatusBadge status={ticket.status} />
-          <PriorityBadge priority={ticket.priority} />
+          <StatusBadge
+            status={
+              ticket.estado.nombre === "ABIERTO"
+                ? "red"
+                : ticket.estado.nombre === "EN_PROCESO"
+                  ? "yellow"
+                  : ticket.estado.nombre === "RESUELTO"
+                    ? "green"
+                    : "gray"
+            }
+          >
+            {ticket.estado.nombre}
+          </StatusBadge>
+          <PriorityBadge
+            priority={
+              ticket.prioridad.nombre === "ALTA"
+                ? "red"
+                : ticket.prioridad.nombre === "MEDIA"
+                  ? "yellow"
+                  : "green"
+            }
+          >
+            {ticket.prioridad.nombre}
+          </PriorityBadge>
         </div>
+        {ticket.estado.nombre === "RESUELTO" && (
+          <Alert type="success" message="Este ticket ha sido resuelto ✓" />
+        )}
       </div>
 
       {/* Main Content */}
@@ -43,7 +108,7 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
           <Card>
             <CardTitle>Descripción</CardTitle>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-              {ticket.description}
+              {ticket.descripcion}
             </p>
           </Card>
 
@@ -79,24 +144,24 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
             <dl className="space-y-4 text-sm">
               <div>
                 <dt className="text-gray-600 dark:text-gray-400 font-medium">
-                  ID del Ticket
+                  Folio
                 </dt>
                 <dd className="text-gray-900 dark:text-white font-mono">
-                  {ticket.id}
+                  {ticket.folio}
                 </dd>
               </div>
               <div>
                 <dt className="text-gray-600 dark:text-gray-400 font-medium">
                   Área
                 </dt>
-                <dd className="text-gray-900 dark:text-white">{ticket.area}</dd>
+                <dd className="text-gray-900 dark:text-white">{ticket.area.nombre}</dd>
               </div>
               <div>
                 <dt className="text-gray-600 dark:text-gray-400 font-medium">
                   Categoría
                 </dt>
                 <dd className="text-gray-900 dark:text-white">
-                  {ticket.category}
+                  {ticket.categoria.nombre}
                 </dd>
               </div>
               <div>
@@ -104,7 +169,7 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
                   Creado
                 </dt>
                 <dd className="text-gray-900 dark:text-white">
-                  {new Date(ticket.createdAt).toLocaleDateString("es-ES")}
+                  {new Date(ticket.fecha_creacion).toLocaleDateString("es-ES")}
                 </dd>
               </div>
               <div>
@@ -112,24 +177,24 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
                   Actualizado
                 </dt>
                 <dd className="text-gray-900 dark:text-white">
-                  {new Date(ticket.updatedAt).toLocaleDateString("es-ES")}
+                  {new Date(ticket.fecha_actualizacion).toLocaleDateString("es-ES")}
                 </dd>
               </div>
-              {ticket.assignedTo && (
+              {ticket.responsable && (
                 <div>
                   <dt className="text-gray-600 dark:text-gray-400 font-medium">
                     Asignado a
                   </dt>
                   <dd className="text-gray-900 dark:text-white">
-                    {ticket.assignedTo}
+                    {ticket.responsable.nombre}
                   </dd>
                 </div>
               )}
             </dl>
           </Card>
 
-          <Button className="w-full" variant="secondary">
-            Editar Ticket
+          <Button className="w-full" variant="secondary" disabled>
+            Editar Ticket (Próximamente)
           </Button>
         </div>
       </div>

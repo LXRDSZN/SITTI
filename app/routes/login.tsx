@@ -17,14 +17,14 @@ const DEMO_USERS = [
     area: "Ventas",
   },
   {
-    email: "tecnico.sistemas@sitti.com",
+    email: "tecnico@sitti.com",
     password: "password123",
-    name: "Carlos López (Técnico Sistemas)",
+    name: "Carlos López (Técnico)",
     role: "técnico",
     area: "Sistemas",
   },
   {
-    email: "admin.sistemas@sitti.com",
+    email: "admin@sitti.com",
     password: "password123",
     name: "Gerente Sistemas",
     role: "administrador",

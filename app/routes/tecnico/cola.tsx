@@ -1,116 +1,169 @@
 import type { Route } from "./+types/cola";
-import { getTicketsByTechnician, getUnassignedTickets } from "../../utils/mockData";
 import { useAuth } from "../../context/AuthContext";
 import { Card, CardTitle } from "../../components/common/Card";
 import { StatusBadge, PriorityBadge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
-import { Link } from "react-router";
+import { useState, useEffect } from "react";
+import { ticketsService, type Ticket } from "../../services/tickets.service";
 
 export const meta: Route.MetaFunction = () => {
-  return [{ title: "Cola de Trabajo - SITTI" }];
+  return [{ title: "Cola de Tickets - SITTI" }];
 };
 
-export default function WorkQueue() {
+export default function TicketQueue() {
   const { user } = useAuth();
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        const response = await ticketsService.getAllTickets();
+        // Filtrar tickets ABIERTO (sin asignar) ordenados por prioridad
+        const abiertos = response.tickets.filter(
+          (t) => t.estado.nombre === "ABIERTO"
+        );
+        // Ordenar por prioridad (ALTA primero)
+        abiertos.sort((a, b) => {
+          const prioridadMap: Record<string, number> = {
+            URGENTE: 0,
+            ALTA: 1,
+            MEDIA: 2,
+            BAJA: 3,
+          };
+          return (
+            (prioridadMap[a.prioridad.nombre] || 99) -
+            (prioridadMap[b.prioridad.nombre] || 99)
+          );
+        });
+        setTickets(abiertos);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al cargar tickets");
+        setTickets([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchTickets();
+    }
+  }, [user]);
+
+  const handleTakeTicket = async (ticketId: number) => {
+    try {
+      setLoadingId(ticketId);
+      // Cambiar estado a EN_PROCESO (id 3) y asignar al técnico actual
+      await ticketsService.updateTicket(ticketId, {
+        id_responsable: parseInt(user.id),
+        id_estado: 3, // EN_PROCESO
+      });
+
+      // Remover ticket de la cola
+      setTickets((prev) => prev.filter((t) => t.id_ticket !== ticketId));
+    } catch (err) {
+      console.error("Error al tomar ticket:", err);
+    } finally {
+      setLoadingId(null);
+    }
+  };
 
   if (!user) return null;
 
-  const myTickets = getTicketsByTechnician(user.id);
-  const urgentTickets = myTickets
-    .filter((t) => t.status !== "resuelto" && t.status !== "cerrado")
-    .sort((a, b) => {
-      const priorityOrder: Record<string, number> = {
-        urgente: 0,
-        alta: 1,
-        media: 2,
-        baja: 3,
-      };
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
-
-  const unassignedTickets = getUnassignedTickets();
+  const getPriorityColor = (prioridad: string) => {
+    if (prioridad === "ALTA" || prioridad === "URGENTE") return "red";
+    if (prioridad === "MEDIA") return "yellow";
+    return "green";
+  };
 
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-        Cola de Trabajo
+        Cola de Tickets
       </h1>
 
-      {/* My Priority Queue */}
-      <Card>
-        <CardTitle>Mis Tickets por Prioridad</CardTitle>
-        <div className="space-y-2">
-          {urgentTickets.length === 0 ? (
-            <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-              No tienes tickets activos
-            </p>
-          ) : (
-            urgentTickets.map((ticket, index) => (
-              <div
-                key={ticket.id}
-                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="text-2xl font-bold text-gray-400 dark:text-gray-600 w-8 text-center">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">
-                      {ticket.title}
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {ticket.id}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <StatusBadge status={ticket.status} />
-                    <PriorityBadge priority={ticket.priority} />
-                  </div>
-                </div>
-                <Link to={`/tecnico/tickets/${ticket.id}`}>
-                  <Button variant="primary" size="sm">
-                    Atender
-                  </Button>
-                </Link>
-              </div>
-            ))
-          )}
-        </div>
+      {/* Summary Card */}
+      <Card className="text-center">
+        <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
+          Tickets Disponibles
+        </p>
+        <p className="text-4xl font-bold text-purple-600">{tickets.length}</p>
       </Card>
 
-      {/* Available Tickets */}
-      <Card>
-        <CardTitle>Tickets Disponibles para Tomar</CardTitle>
-        <div className="space-y-2">
-          {unassignedTickets.length === 0 ? (
+      {/* Tickets Available */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Tickets Disponibles para Tomar
+        </h2>
+
+        {loading ? (
+          <Card>
             <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-              No hay tickets disponibles
+              Cargando tickets...
             </p>
-          ) : (
-            unassignedTickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">
-                    {ticket.title}
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {ticket.description.substring(0, 80)}...
-                  </p>
-                  <div className="flex gap-2 mt-2">
-                    <PriorityBadge priority={ticket.priority} />
+          </Card>
+        ) : error ? (
+          <Card className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700">
+            <p className="text-red-800 dark:text-red-300">Error: {error}</p>
+          </Card>
+        ) : tickets.length === 0 ? (
+          <Card>
+            <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+              ¡Excelente! No hay tickets disponibles en la cola
+            </p>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {tickets.map((ticket) => (
+              <Card key={ticket.id_ticket} className="hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {ticket.folio}
+                      </h3>
+                      <PriorityBadge
+                        priority={getPriorityColor(ticket.prioridad.nombre)}
+                      >
+                        {ticket.prioridad.nombre}
+                      </PriorityBadge>
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 font-medium mb-2">
+                      {ticket.titulo}
+                    </p>
+                    <p className="text-gray-600 dark:text-gray-400 mb-3">
+                      {ticket.descripcion.substring(0, 150)}...
+                    </p>
+                    <div className="flex gap-4 text-sm text-gray-500 dark:text-gray-400">
+                      <span>Área: {ticket.area.nombre}</span>
+                      <span>Solicitante: {ticket.solicitante.nombre}</span>
+                      <span>
+                        Creado:{" "}
+                        {new Date(ticket.fecha_creacion).toLocaleDateString(
+                          "es-ES"
+                        )}
+                      </span>
+                    </div>
                   </div>
+                  <Button
+                    onClick={() => handleTakeTicket(ticket.id_ticket)}
+                    disabled={loadingId === ticket.id_ticket}
+                    className="flex-shrink-0 whitespace-nowrap"
+                  >
+                    {loadingId === ticket.id_ticket
+                      ? "Asignando..."
+                      : "Tomar Ticket"}
+                  </Button>
                 </div>
-                <Button variant="secondary" size="sm">
-                  Tomar
-                </Button>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

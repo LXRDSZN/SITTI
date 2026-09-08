@@ -1,11 +1,11 @@
 import type { Route } from "./+types/asignados";
-import { getTicketsByTechnician } from "../../utils/mockData";
 import { useAuth } from "../../context/AuthContext";
 import { Card, CardTitle } from "../../components/common/Card";
 import { StatusBadge, PriorityBadge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Link } from "react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { ticketsService, type Ticket } from "../../services/tickets.service";
 
 export const meta: Route.MetaFunction = () => {
   return [{ title: "Tickets Asignados - SITTI" }];
@@ -14,14 +14,51 @@ export const meta: Route.MetaFunction = () => {
 export default function AssignedTickets() {
   const { user } = useAuth();
   const [filterStatus, setFilterStatus] = useState<string>("todos");
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        const response = await ticketsService.getAllTickets();
+        // Filtrar solo tickets asignados al técnico actual
+        const technicianId = user?.id ? parseInt(user.id) : null;
+        const assignedTickets = response.tickets.filter(
+          (t) => t.responsable && t.responsable.id_usuario === technicianId
+        );
+        setTickets(assignedTickets);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al cargar tickets");
+        setTickets([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchTickets();
+    }
+  }, [user?.id]);
 
   if (!user) return null;
 
-  const tickets = getTicketsByTechnician(user.id);
+  const getStateKey = (estadoNombre: string): string => {
+    const estado = estadoNombre.toUpperCase();
+    if (estado === "ABIERTO") return "abierto";
+    if (estado === "PENDIENTE") return "en-progreso"; // PENDIENTE se muestra como En Progreso
+    if (estado === "EN_PROCESO") return "en-progreso";
+    if (estado === "RESUELTO") return "resuelto";
+    if (estado === "ASIGNADO") return "asignado";
+    return "otros";
+  };
+
   const filteredTickets =
     filterStatus === "todos"
       ? tickets
-      : tickets.filter((t) => t.status === filterStatus);
+      : tickets.filter((t) => getStateKey(t.estado.nombre) === filterStatus);
 
   return (
     <div className="space-y-8">
@@ -54,47 +91,94 @@ export default function AssignedTickets() {
         </div>
       </Card>
 
+      {/* Loading */}
+      {loading && (
+        <Card>
+          <p className="text-center text-gray-500 dark:text-gray-400 py-12">
+            Cargando tickets...
+          </p>
+        </Card>
+      )}
+
+      {/* Error */}
+      {error && !loading && (
+        <Card className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700">
+          <p className="text-red-800 dark:text-red-300">
+            ✕ Error: {error}
+          </p>
+        </Card>
+      )}
+
       {/* Tickets Grid */}
-      <div className="grid gap-4">
-        {filteredTickets.map((ticket) => (
-          <Card key={ticket.id}>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-4 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {ticket.title}
-                  </h3>
-                  <StatusBadge status={ticket.status} />
-                  <PriorityBadge priority={ticket.priority} />
+      {!loading && (
+        <div className="grid gap-4">
+          {filteredTickets.length > 0 ? (
+            filteredTickets.map((ticket) => (
+              <Card key={ticket.id_ticket}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {ticket.titulo}
+                      </h3>
+                      <StatusBadge
+                        status={
+                          ticket.estado.nombre === "ABIERTO"
+                            ? "red"
+                            : ticket.estado.nombre === "EN_PROCESO"
+                              ? "yellow"
+                              : ticket.estado.nombre === "RESUELTO"
+                                ? "green"
+                                : "blue"
+                        }
+                      >
+                        {ticket.estado.nombre}
+                      </StatusBadge>
+                      <PriorityBadge
+                        priority={
+                          ticket.prioridad.nombre === "ALTA"
+                            ? "red"
+                            : ticket.prioridad.nombre === "MEDIA"
+                              ? "yellow"
+                              : "green"
+                        }
+                      >
+                        {ticket.prioridad.nombre}
+                      </PriorityBadge>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 mb-3">
+                      {ticket.descripcion.substring(0, 120)}...
+                    </p>
+                    <div className="flex gap-4 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
+                      <span>Folio: {ticket.folio}</span>
+                      <span>Área: {ticket.area.nombre}</span>
+                      <span>
+                        Creado:{" "}
+                        {new Date(ticket.fecha_creacion).toLocaleDateString(
+                          "es-ES"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <Link to={`/tecnico/tickets/${ticket.id_ticket}`}>
+                    <Button variant="secondary" className="text-xs py-1 px-2">
+                      Abrir
+                    </Button>
+                  </Link>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 mb-3">
-                  {ticket.description.substring(0, 120)}...
-                </p>
-                <div className="flex gap-4 text-sm text-gray-500 dark:text-gray-400">
-                  <span>ID: {ticket.id}</span>
-                  <span>Área: {ticket.area}</span>
-                  <span>
-                    Creado:{" "}
-                    {new Date(ticket.createdAt).toLocaleDateString("es-ES")}
-                  </span>
-                </div>
-              </div>
-              <Link to={`/tecnico/tickets/${ticket.id}`}>
-                <Button variant="primary" size="sm">
-                  Abrir
-                </Button>
-              </Link>
-            </div>
-          </Card>
-        ))}
-        {filteredTickets.length === 0 && (
-          <Card>
-            <p className="text-center text-gray-500 dark:text-gray-400 py-12">
-              No hay tickets que coincidan con los filtros
-            </p>
-          </Card>
-        )}
-      </div>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <p className="text-center text-gray-500 dark:text-gray-400 py-12">
+                {tickets.length === 0
+                  ? "No tienes tickets asignados"
+                  : "No hay tickets que coincidan con los filtros"}
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }

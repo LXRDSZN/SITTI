@@ -1,10 +1,12 @@
 import type { Route } from "./+types/tickets.\$id";
-import { mockTickets } from "../../utils/mockData";
 import { useAuth } from "../../context/AuthContext";
 import { Card, CardTitle } from "../../components/common/Card";
 import { StatusBadge, PriorityBadge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
-import { useState } from "react";
+import { Alert } from "../../components/common/Alert";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { ticketsService, type Ticket } from "../../services/tickets.service";
 
 export const meta: Route.MetaFunction = ({ params }) => {
   return [{ title: `Ticket ${params.id} - SITTI` }];
@@ -12,29 +14,156 @@ export const meta: Route.MetaFunction = ({ params }) => {
 
 export default function TechnicianTicketDetail({ params }: Route.ComponentProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [comment, setComment] = useState("");
-  const [status, setStatus] = useState<string>("");
-  const ticket = mockTickets.find((t) => t.id === params.id);
+  const [newStatus, setNewStatus] = useState<string>("");
+  const [submittingComment, setSubmittingComment] = useState(false);
 
-  if (!ticket || !user) {
+  useEffect(() => {
+    const fetchTicket = async () => {
+      try {
+        setLoading(true);
+        const response = await ticketsService.getTicketById(parseInt(params.id));
+        setTicket(response.ticket);
+        setNewStatus(response.ticket.estado.nombre);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al cargar el ticket");
+        setTicket(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchTicket();
+    }
+  }, [params.id, user]);
+
+  if (loading) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600 dark:text-gray-400">Ticket no encontrado</p>
+        <p className="text-gray-600 dark:text-gray-400">Cargando ticket...</p>
       </div>
     );
   }
+
+  if (error || !ticket) {
+    return (
+      <div className="space-y-4">
+        <Alert
+          type="error"
+          title="Error"
+          message={error || "Ticket no encontrado"}
+        />
+        <Button onClick={() => navigate("/tecnico/asignados")}>
+          Volver a Tickets Asignados
+        </Button>
+      </div>
+    );
+  }
+
+  const handleUpdateStatus = async () => {
+    if (newStatus === ticket.estado.nombre) {
+      return;
+    }
+
+    try {
+      // Mapear nombre de estado a id
+      const estadoMap: Record<string, number> = {
+        "ABIERTO": 1,
+        "ASIGNADO": 2,
+        "EN_PROCESO": 3,
+        "PENDIENTE": 4,
+        "RESUELTO": 5,
+        "CERRADO": 6,
+      };
+
+      const idEstado = estadoMap[newStatus];
+      const response = await ticketsService.updateTicket(ticket.id_ticket, {
+        id_estado: idEstado,
+      });
+
+      // Actualizar el ticket localmente con la respuesta del servidor
+      setTicket(response.ticket);
+    } catch (err) {
+      console.error("Error al actualizar estado:", err);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!comment.trim() || !user) {
+      return;
+    }
+
+    try {
+      setSubmittingComment(true);
+      const response = await fetch('/api/comentarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_ticket: ticket.id_ticket,
+          id_usuario: parseInt(user.id),
+          contenido: comment,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al guardar comentario');
+      }
+
+      // Limpiar textarea
+      setComment("");
+      
+      // Recargar ticket para ver comentarios
+      const ticketResponse = await ticketsService.getTicketById(ticket.id_ticket);
+      setTicket(ticketResponse.ticket);
+    } catch (err) {
+      console.error("Error al agregar comentario:", err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          {ticket.title}
+          {ticket.titulo}
         </h1>
         <div className="flex gap-3 mb-4">
-          <StatusBadge status={ticket.status} />
-          <PriorityBadge priority={ticket.priority} />
+          <StatusBadge
+            status={
+              ticket.estado.nombre === "ABIERTO"
+                ? "red"
+                : ticket.estado.nombre === "EN_PROCESO"
+                  ? "yellow"
+                  : ticket.estado.nombre === "RESUELTO"
+                    ? "green"
+                    : "blue"
+            }
+          >
+            {ticket.estado.nombre}
+          </StatusBadge>
+          <PriorityBadge
+            priority={
+              ticket.prioridad.nombre === "ALTA"
+                ? "red"
+                : ticket.prioridad.nombre === "MEDIA"
+                  ? "yellow"
+                  : "green"
+            }
+          >
+            {ticket.prioridad.nombre}
+          </PriorityBadge>
         </div>
+        {ticket.estado.nombre === "RESUELTO" && (
+          <Alert type="success" message="Ticket resuelto ✓" />
+        )}
       </div>
 
       {/* Main Content */}
@@ -44,55 +173,64 @@ export default function TechnicianTicketDetail({ params }: Route.ComponentProps)
           <Card>
             <CardTitle>Descripción del Problema</CardTitle>
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-              {ticket.description}
+              {ticket.descripcion}
             </p>
           </Card>
 
-          {/* Work Log */}
+          {/* Work Area */}
           <Card>
-            <CardTitle>Bitácora de Trabajo</CardTitle>
+            <CardTitle>Notas de Trabajo</CardTitle>
             <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  No hay comentarios de trabajo aún
-                </p>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                  Agregar Nota de Trabajo
+                  Agregar Comentario
                 </label>
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder="Describe lo que has hecho..."
+                  placeholder="Describe el trabajo realizado..."
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={4}
                 />
-                <Button className="mt-3" disabled={!comment.trim()}>
-                  Agregar Nota
+                <Button 
+                  className="mt-3" 
+                  disabled={!comment.trim() || submittingComment}
+                  onClick={handleAddComment}
+                >
+                  {submittingComment ? "Guardando..." : "Agregar Comentario"}
                 </Button>
               </div>
             </div>
           </Card>
 
-          {/* Status Update */}
+          {/* Update Status */}
           <Card>
-            <CardTitle>Cambiar Estado</CardTitle>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { value: "en-progreso", label: "En Progreso" },
-                { value: "resuelto", label: "Resuelto" },
-                { value: "cerrado", label: "Cerrado" },
-              ].map((s) => (
-                <Button
-                  key={s.value}
-                  variant={status === s.value ? "primary" : "secondary"}
-                  onClick={() => setStatus(s.value)}
-                  className="w-full"
+            <CardTitle>Actualizar Estado</CardTitle>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                  Nuevo Estado
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {s.label}
-                </Button>
-              ))}
+                  <option value="ABIERTO">Abierto</option>
+                  <option value="ASIGNADO">Asignado</option>
+                  <option value="PENDIENTE">Pendiente</option>
+                  <option value="EN_PROCESO">En Proceso</option>
+                  <option value="RESUELTO">Resuelto</option>
+                </select>
+              </div>
+              <Button
+                onClick={handleUpdateStatus}
+                disabled={newStatus === ticket.estado.nombre}
+              >
+                {newStatus === ticket.estado.nombre
+                  ? "Sin cambios"
+                  : "Actualizar Estado"}
+              </Button>
             </div>
           </Card>
         </div>
@@ -104,32 +242,50 @@ export default function TechnicianTicketDetail({ params }: Route.ComponentProps)
             <dl className="space-y-4 text-sm">
               <div>
                 <dt className="text-gray-600 dark:text-gray-400 font-medium">
-                  ID
+                  Folio
                 </dt>
                 <dd className="text-gray-900 dark:text-white font-mono">
-                  {ticket.id}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-gray-600 dark:text-gray-400 font-medium">
-                  Creado por
-                </dt>
-                <dd className="text-gray-900 dark:text-white">
-                  {ticket.createdBy}
+                  {ticket.folio}
                 </dd>
               </div>
               <div>
                 <dt className="text-gray-600 dark:text-gray-400 font-medium">
                   Área
                 </dt>
-                <dd className="text-gray-900 dark:text-white">{ticket.area}</dd>
+                <dd className="text-gray-900 dark:text-white">
+                  {ticket.area.nombre}
+                </dd>
               </div>
               <div>
                 <dt className="text-gray-600 dark:text-gray-400 font-medium">
                   Categoría
                 </dt>
                 <dd className="text-gray-900 dark:text-white">
-                  {ticket.category}
+                  {ticket.categoria.nombre}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-600 dark:text-gray-400 font-medium">
+                  Prioridad
+                </dt>
+                <dd className="text-gray-900 dark:text-white">
+                  {ticket.prioridad.nombre}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-600 dark:text-gray-400 font-medium">
+                  Solicitante
+                </dt>
+                <dd className="text-gray-900 dark:text-white">
+                  {ticket.solicitante.nombre}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-600 dark:text-gray-400 font-medium">
+                  Email Solicitante
+                </dt>
+                <dd className="text-gray-900 dark:text-white text-xs">
+                  {ticket.solicitante.correo}
                 </dd>
               </div>
               <div>
@@ -137,22 +293,28 @@ export default function TechnicianTicketDetail({ params }: Route.ComponentProps)
                   Creado
                 </dt>
                 <dd className="text-gray-900 dark:text-white">
-                  {new Date(ticket.createdAt).toLocaleDateString("es-ES")}
+                  {new Date(ticket.fecha_creacion).toLocaleDateString("es-ES")}
                 </dd>
               </div>
               <div>
                 <dt className="text-gray-600 dark:text-gray-400 font-medium">
-                  Última actualización
+                  Actualizado
                 </dt>
                 <dd className="text-gray-900 dark:text-white">
-                  {new Date(ticket.updatedAt).toLocaleDateString("es-ES")}
+                  {new Date(ticket.fecha_actualizacion).toLocaleDateString(
+                    "es-ES"
+                  )}
                 </dd>
               </div>
             </dl>
           </Card>
 
-          <Button className="w-full" disabled={!status}>
-            Guardar Cambios
+          <Button
+            onClick={() => navigate("/tecnico/asignados")}
+            variant="secondary"
+            className="w-full"
+          >
+            Volver
           </Button>
         </div>
       </div>

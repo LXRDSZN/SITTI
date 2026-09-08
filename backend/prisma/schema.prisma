@@ -86,6 +86,9 @@ model Usuario {
   
   // Cambios registrados en historial
   historialTickets HistorialTicket[]
+  
+  // Notificaciones del usuario
+  notificaciones   Notificacion[]
 
   @@index([id_rol])
   @@index([id_area])
@@ -118,6 +121,7 @@ model Ticket {
   comentarios       Comentario[]
   adjuntos          Adjunto[]
   historial         HistorialTicket[]
+  notificaciones    Notificacion[]
 
   @@index([id_solicitante])
   @@index([id_responsable])
@@ -176,4 +180,28 @@ model HistorialTicket {
   @@index([id_ticket])
   @@index([id_usuario])
   @@map("historial_tickets")
+}
+
+// ============================================
+// NOTIFICACIONES
+// ============================================
+
+model Notificacion {
+  id_notificacion Int       @id @default(autoincrement())
+  id_usuario      Int
+  id_ticket       Int
+  titulo          String
+  mensaje         String
+  tipo            String    // ticket_resuelto, ticket_asignado, ticket_actualizado, comentario
+  leido           Boolean   @default(false)
+  fecha_creacion  DateTime  @default(now())
+  fecha_lectura   DateTime?
+  
+  usuario         Usuario   @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  ticket          Ticket    @relation(fields: [id_ticket], references: [id_ticket], onDelete: Cascade)
+
+  @@index([id_usuario])
+  @@index([id_ticket])
+  @@index([leido])
+  @@map("notificaciones")
 }
