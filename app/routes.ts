@@ -29,6 +29,6 @@ export default [
   route("admin/areas", "routes/admin/areas.tsx"),
   route("admin/categorias", "routes/admin/categorias.tsx"),
   route("admin/reportes", "routes/admin/reportes.tsx"),
-  route("admin/configuracion", "routes/admin/configuracion.tsx"),
+  route("admin/notificaciones", "routes/admin/notificaciones.tsx"),
   route("admin/perfil", "routes/admin/perfil.tsx"),
 ] satisfies RouteConfig;

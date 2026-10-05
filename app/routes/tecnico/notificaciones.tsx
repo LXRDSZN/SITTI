@@ -101,6 +101,7 @@ export default function Notifications() {
     if (tipo === "ticket_resuelto") return "bg-green-50 dark:bg-green-900/20 border-l-green-600";
     if (tipo === "ticket_asignado") return "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600";
     if (tipo === "ticket_actualizado") return "bg-yellow-50 dark:bg-yellow-900/20 border-l-yellow-600";
+    if (tipo === "comentario") return "bg-indigo-50 dark:bg-indigo-900/20 border-l-indigo-600";
     return "bg-gray-50 dark:bg-gray-900/20 border-l-gray-600";
   };
 

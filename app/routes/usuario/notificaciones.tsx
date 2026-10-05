@@ -2,7 +2,7 @@ import type { Route } from "./+types/notificaciones";
 import { Card } from "../../components/common/Card";
 import { useAuth } from "../../context/AuthContext";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { notificationsService, type Notification } from "../../services/notifications.service";
 import { Toast } from "../../components/common/Alert";
 
@@ -13,6 +13,7 @@ export const meta: Route.MetaFunction = () => {
 export default function Notifications() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +80,10 @@ export default function Notifications() {
       await handleMarkAsRead(notif.id_notificacion);
     }
     if (notif.ticket?.id_ticket) {
-      navigate(`/usuario/tickets/${notif.ticket.id_ticket}`);
+      const prefix = location.pathname.startsWith("/admin/")
+        ? "admin"
+        : "usuario";
+      navigate(`/${prefix}/tickets/${notif.ticket.id_ticket}`);
     }
   };
 
@@ -101,6 +105,7 @@ export default function Notifications() {
     if (tipo === "ticket_resuelto") return "bg-green-50 dark:bg-green-900/20 border-l-green-600";
     if (tipo === "ticket_asignado") return "bg-blue-50 dark:bg-blue-900/20 border-l-blue-600";
     if (tipo === "ticket_actualizado") return "bg-yellow-50 dark:bg-yellow-900/20 border-l-yellow-600";
+    if (tipo === "comentario") return "bg-indigo-50 dark:bg-indigo-900/20 border-l-indigo-600";
     return "bg-gray-50 dark:bg-gray-900/20 border-l-gray-600";
   };
 

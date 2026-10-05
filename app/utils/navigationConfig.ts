@@ -55,7 +55,7 @@ export const navigationConfigs: Record<UserRole, RoleNavConfig> = {
       { label: "Áreas", href: "/admin/areas", icon: "🏢" },
       { label: "Categorías", href: "/admin/categorias", icon: "📁" },
       { label: "Reportes", href: "/admin/reportes", icon: "📈" },
-      { label: "Configuración", href: "/admin/configuracion", icon: "⚙️" },
+      { label: "Notificaciones", href: "/admin/notificaciones", icon: "🔔" },
     ],
     secondaryNav: [
       { label: "Perfil", href: "/admin/perfil", icon: "👤" },

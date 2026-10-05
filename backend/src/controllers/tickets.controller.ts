@@ -123,6 +123,23 @@ export const update = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'No tienes permisos para actualizar este ticket' });
     }
 
+    if (rol === 'tecnico' && req.body.id_responsable !== undefined) {
+      if (Number(req.body.id_responsable) !== usuario.id_usuario) {
+        return res.status(403).json({
+          error: 'Un técnico solo puede asignarse tickets a sí mismo',
+        });
+      }
+
+      if (
+        ticketActual.id_responsable !== null &&
+        ticketActual.id_responsable !== usuario.id_usuario
+      ) {
+        return res.status(409).json({
+          error: 'Este ticket ya fue tomado por otro técnico',
+        });
+      }
+    }
+
     if (esSolicitante && ticketActual.estado.nombre !== 'ABIERTO') {
       return res.status(409).json({
         error: 'Solo puedes editar tickets que todavía están abiertos',

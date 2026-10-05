@@ -169,26 +169,58 @@ export const updateTicket = async (
     throw new Error('Ticket no encontrado');
   }
 
-  const ticket = await prisma.ticket.update({
-    where: { id_ticket },
-    data: {
-      ...data,
-      fecha_actualizacion: new Date(),
-      // Si se resuelve, registrar fecha de cierre
-      ...(data.id_estado && 
-        (await prisma.estado.findUnique({ where: { id_estado: data.id_estado } }))?.nombre === 'RESUELTO'
-        ? { fecha_cierre: new Date() }
-        : {}),
-    },
-    include: {
-      solicitante: { select: { id_usuario: true, nombre: true, correo: true } },
-      responsable: { select: { id_usuario: true, nombre: true, correo: true } },
-      area: true,
-      categoria: true,
-      prioridad: true,
-      estado: true,
-    },
-  });
+  const updateData = {
+    ...data,
+    fecha_actualizacion: new Date(),
+    ...(data.id_estado &&
+      (await prisma.estado.findUnique({ where: { id_estado: data.id_estado } }))?.nombre === 'RESUELTO'
+      ? { fecha_cierre: new Date() }
+      : {}),
+  };
+
+  let ticket;
+  if (data.id_responsable && ticketAnterior.id_responsable === null) {
+    const assignment = await prisma.ticket.updateMany({
+      where: {
+        id_ticket,
+        id_responsable: null,
+      },
+      data: updateData,
+    });
+
+    if (assignment.count === 0) {
+      throw new Error('Este ticket ya fue tomado por otro técnico');
+    }
+
+    ticket = await prisma.ticket.findUnique({
+      where: { id_ticket },
+      include: {
+        solicitante: { select: { id_usuario: true, nombre: true, correo: true } },
+        responsable: { select: { id_usuario: true, nombre: true, correo: true } },
+        area: true,
+        categoria: true,
+        prioridad: true,
+        estado: true,
+      },
+    });
+  } else {
+    ticket = await prisma.ticket.update({
+      where: { id_ticket },
+      data: updateData,
+      include: {
+        solicitante: { select: { id_usuario: true, nombre: true, correo: true } },
+        responsable: { select: { id_usuario: true, nombre: true, correo: true } },
+        area: true,
+        categoria: true,
+        prioridad: true,
+        estado: true,
+      },
+    });
+  }
+
+  if (!ticket) {
+    throw new Error('Ticket no encontrado después de actualizar');
+  }
 
   // Crear notificaciones según los cambios
   if (data.id_responsable && data.id_responsable !== ticketAnterior.id_responsable) {

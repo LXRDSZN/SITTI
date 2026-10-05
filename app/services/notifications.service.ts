@@ -6,7 +6,7 @@ export interface Notification {
   id_ticket: number;
   titulo: string;
   mensaje: string;
-  tipo: 'ticket_resuelto' | 'ticket_asignado' | 'ticket_actualizado' | 'comentario';
+  tipo: 'ticket_creado' | 'ticket_resuelto' | 'ticket_asignado' | 'ticket_actualizado' | 'comentario';
   leido: boolean;
   fecha_creacion: string;
   fecha_lectura: string | null;

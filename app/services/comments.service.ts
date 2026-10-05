@@ -23,4 +23,8 @@ export const commentsService = {
       comentario,
     });
   },
+
+  async delete(commentId: number): Promise<{ success: boolean; message: string }> {
+    return api.delete(`/api/comentarios/${commentId}`);
+  },
 };

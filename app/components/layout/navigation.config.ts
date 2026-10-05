@@ -39,7 +39,7 @@ const navigationConfig: Record<UserRole, RoleNavConfig> = {
       { label: "Áreas", href: "/admin/areas" },
       { label: "Categorías", href: "/admin/categorias" },
       { label: "Reportes", href: "/admin/reportes" },
-      { label: "Configuración", href: "/admin/configuracion" },
+      { label: "Notificaciones", href: "/admin/notificaciones" },
       { label: "Perfil", href: "/admin/perfil" },
     ],
   },

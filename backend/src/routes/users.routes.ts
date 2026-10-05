@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import prisma from '../config/database.js';
-import { hashPassword } from '../utils/password.js';
+import { hashPassword, comparePassword } from '../utils/password.js';
 import { requireRole } from '../middleware/role.middleware.js';
 
 const router = Router();
@@ -60,7 +60,7 @@ router.get('/meta/roles-areas', authMiddleware, requireRole('Administrador'), as
 // POST /api/users - Crear un nuevo usuario
 router.post('/', authMiddleware, requireRole('Administrador'), async (req: Request, res: Response) => {
   try {
-    const { nombre, correo, telefono, password, id_rol, id_area, activo } = req.body;
+    const { nombre, correo, telefono, password, currentPassword, id_rol, id_area, activo } = req.body;
 
     if (!nombre || !correo || !id_rol || !id_area) {
       return res.status(400).json({ success: false, error: 'Faltan campos requeridos (nombre, correo, id_rol, id_area)' });
@@ -116,7 +116,16 @@ router.post('/', authMiddleware, requireRole('Administrador'), async (req: Reque
 router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { nombre, correo, telefono, password, id_rol, id_area, activo } = req.body;
+    const {
+      nombre,
+      correo,
+      telefono,
+      password,
+      currentPassword,
+      id_rol,
+      id_area,
+      activo,
+    } = req.body;
 
     const id_usuario = parseInt(id);
 
@@ -134,10 +143,10 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
     }
 
     const esPropioPerfil = req.usuario.id_usuario === id_usuario;
-    if (esPropioPerfil && (nombre !== undefined || id_rol !== undefined || id_area !== undefined || activo !== undefined || password !== undefined)) {
+    if (esPropioPerfil && (nombre !== undefined || id_rol !== undefined || id_area !== undefined || activo !== undefined)) {
       return res.status(400).json({
         success: false,
-        error: 'En tu perfil solo puedes actualizar correo y teléfono',
+        error: 'En tu perfil solo puedes actualizar correo, teléfono y contraseña',
       });
     }
 
@@ -159,6 +168,32 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
     if (id_area !== undefined) dataToUpdate.id_area = parseInt(id_area);
     if (activo !== undefined) dataToUpdate.activo = Boolean(activo);
     if (password && password.trim().length > 0) {
+      if (esPropioPerfil) {
+        if (typeof currentPassword !== 'string' || !currentPassword.trim()) {
+          return res.status(400).json({
+            success: false,
+            error: 'Debes proporcionar tu contraseña actual',
+          });
+        }
+
+        const passwordValida = await comparePassword(
+          currentPassword,
+          usuarioExistente.password_hash,
+        );
+        if (!passwordValida) {
+          return res.status(400).json({
+            success: false,
+            error: 'La contraseña actual no es válida',
+          });
+        }
+      }
+
+      if (password.trim().length < 8) {
+        return res.status(400).json({
+          success: false,
+          error: 'La nueva contraseña debe tener al menos 8 caracteres',
+        });
+      }
       dataToUpdate.password_hash = await hashPassword(password);
     }
 

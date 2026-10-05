@@ -49,6 +49,7 @@ export interface UpdateUserInput {
   correo?: string;
   telefono?: string | null;
   password?: string;
+  currentPassword?: string;
   id_rol?: number;
   id_area?: number;
   activo?: boolean;
