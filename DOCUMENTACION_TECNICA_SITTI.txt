@@ -1,0 +1,1010 @@
+DOCUMENTACION TECNICA DEL SISTEMA SITTI
+Sistema Integral de Gestion de Tickets
+=====================================================================
+
+Version documentada: 1.0.0
+Fecha de elaboracion: 02 de octubre de 2026
+Repositorio: LXRDSZN/SITTI
+Estado general: Operativo en entorno local
+
+=====================================================================
+1. DESCRIPCION GENERAL
+=====================================================================
+
+SITTI es una plataforma web para registrar, consultar, asignar,
+actualizar y dar seguimiento a solicitudes de soporte tecnico. El
+sistema separa las funciones de Usuario, Tecnico y Administrador,
+permite administrar el ciclo de vida de los tickets y conserva la
+informacion en PostgreSQL.
+
+El proyecto esta compuesto por:
+
+- Frontend desarrollado con React 19, React Router 8, TypeScript,
+  Tailwind CSS y Vite.
+- Backend desarrollado con Node.js, Express y TypeScript.
+- Persistencia en PostgreSQL 16 mediante Prisma ORM.
+- Autenticacion basada en JWT.
+- Hash de contrasenas mediante bcrypt.
+- Ejecucion local y despliegue de desarrollo mediante Docker Compose.
+
+Objetivos principales:
+
+1. Centralizar las solicitudes de soporte.
+2. Asignar tickets a tecnicos responsables.
+3. Permitir el seguimiento por estado, prioridad, area y categoria.
+4. Proporcionar vistas diferentes segun el rol del usuario.
+5. Mantener historial, comentarios, adjuntos y notificaciones.
+6. Facilitar la consulta de informacion operativa para administracion.
+
+=====================================================================
+2. DISENO
+=====================================================================
+
+2.1 Usuarios del sistema
+
+USUARIO:
+- Inicia sesion.
+- Registra nuevos tickets.
+- Consulta los tickets que solicito.
+- Consulta el detalle y el estado de sus tickets.
+- Consulta notificaciones y su perfil.
+
+TECNICO:
+- Consulta el tablero de trabajo.
+- Consulta la cola de tickets.
+- Consulta tickets asignados, pendientes y resueltos.
+- Actualiza el estado, prioridad y responsable de un ticket.
+- Consulta notificaciones y su perfil.
+
+ADMINISTRADOR:
+- Consulta el tablero general.
+- Consulta y administra todos los tickets.
+- Administra usuarios, areas y categorias.
+- Consulta la vista de reportes.
+- Accede a configuracion y perfil administrativo.
+
+2.2 Reglas funcionales principales
+
+- Cada usuario pertenece a un rol y a un area.
+- Cada ticket tiene un solicitante obligatorio.
+- Un ticket puede tener un responsable tecnico o permanecer sin
+  asignar.
+- Cada ticket pertenece a un area, categoria, prioridad y estado.
+- El folio del ticket es unico.
+- La fecha de creacion se genera automaticamente.
+- La fecha de actualizacion se modifica automaticamente mediante
+  Prisma.
+- La fecha de cierre es opcional y se utiliza al cerrar el ticket.
+- Los comentarios, adjuntos, historial y notificaciones se relacionan
+  con el ticket.
+- Las relaciones criticas utilizan restricciones de integridad
+  referencial.
+
+2.3 Estados del ticket
+
+- ABIERTO: ticket creado y pendiente de atencion.
+- ASIGNADO: ticket asignado a un tecnico.
+- EN_PROCESO: ticket en atencion.
+- PENDIENTE: requiere informacion, autorizacion o una accion externa.
+- RESUELTO: la solucion fue aplicada.
+- CERRADO: el ciclo de atencion finalizo.
+
+2.4 Catalogos
+
+Roles:
+- Usuario
+- Tecnico
+- Administrador
+
+Areas documentadas en el proyecto:
+- Ventas
+- Refacciones
+- Taller
+- Administracion
+- Sistemas / TI
+
+Categorias:
+- Hardware
+- Software
+- Redes / Conectividad
+- Impresoras
+- Accesos / Cuentas
+- Otros
+
+Prioridades:
+- BAJA
+- MEDIA
+- ALTA
+
+=====================================================================
+3. ARQUITECTURA DEL SISTEMA
+=====================================================================
+
+La arquitectura es de tres capas: presentacion, servicios y datos.
+El navegador consume una API REST protegida con JWT. El backend
+consulta PostgreSQL mediante Prisma.
+
+                         USUARIO
+                           |
+                           v
+                 NAVEGADOR WEB
+                 localhost:5173
+                           |
+                    HTTP / REST + JWT
+                           |
+                           v
+             FRONTEND REACT / REACT ROUTER
+             - Rutas por rol
+             - Componentes reutilizables
+             - AuthContext
+             - Servicios API
+             - Tailwind CSS
+                           |
+                    HTTP / JSON
+                           |
+                           v
+             BACKEND EXPRESS / TYPESCRIPT
+             localhost:3000
+             - Rutas
+             - Controladores
+             - Servicios
+             - Middleware de autenticacion
+             - Validadores
+             - Manejo de errores
+                           |
+                    Prisma ORM
+                           |
+                           v
+                   POSTGRESQL 16
+                   sitti_db
+
+Componentes principales:
+
+Frontend:
+- app/routes/: pantallas y rutas de usuario, tecnico y administrador.
+- app/components/: componentes comunes, formularios, dashboard y
+  tickets.
+- app/context/AuthContext.tsx: estado global de autenticacion.
+- app/services/api.ts: cliente HTTP y envio del token.
+- app/services/*.service.ts: acceso tipado a los recursos de la API.
+- app/types/: tipos TypeScript.
+
+Backend:
+- backend/src/routes/: declaracion de endpoints.
+- backend/src/controllers/: recepcion de solicitudes y respuestas.
+- backend/src/services/: reglas de negocio y acceso a datos.
+- backend/src/middleware/: autenticacion, roles, errores y carga.
+- backend/src/validators/: esquemas de validacion.
+- backend/src/config/: variables de entorno y conexion Prisma.
+- backend/prisma/: esquema, migraciones y seed.
+
+Flujo de una solicitud:
+
+1. El usuario interactua con una vista del frontend.
+2. El servicio correspondiente genera una solicitud HTTP.
+3. El cliente API agrega Content-Type y Authorization cuando existe
+   una sesion.
+4. Express recibe la solicitud y ejecuta middleware.
+5. El controlador valida la entrada y llama al servicio.
+6. El servicio consulta o modifica PostgreSQL mediante Prisma.
+7. El backend devuelve JSON.
+8. El frontend actualiza la vista, muestra resultados o reporta el
+   error al usuario.
+
+=====================================================================
+4. DISENO DE ALMACENAMIENTO
+=====================================================================
+
+4.1 Motor y conexion
+
+Motor: PostgreSQL 16
+Base de datos: sitti_db
+Puerto local: 5432
+Usuario de desarrollo: sitti_user
+Contenedor: sitti-postgres
+Volumen Docker: postgres_data
+
+La cadena de conexion se configura con DATABASE_URL en el archivo
+backend/.env. Para ejecucion local fuera de Docker, el host esperado
+es localhost. Dentro de Docker Compose, el host esperado es postgres.
+
+Ejemplo de configuracion local:
+
+DATABASE_URL="postgresql://sitti_user:<contrasena>@localhost:5432/sitti_db"
+NODE_ENV="development"
+PORT=3000
+
+No se deben publicar contrasenas, secretos JWT ni archivos .env en
+documentacion distribuida.
+
+4.2 Persistencia y migraciones
+
+El esquema se encuentra en:
+backend/prisma/schema.prisma
+
+Las migraciones se encuentran en:
+backend/prisma/migrations/
+
+La inicializacion normal de desarrollo realiza:
+
+1. Levantamiento del contenedor PostgreSQL.
+2. Generacion del cliente Prisma.
+3. Aplicacion de migraciones pendientes.
+4. Ejecucion del seed de catalogos y datos de prueba.
+5. Inicio del backend.
+
+Comandos principales:
+
+cd backend
+npm install
+npm run db:migrate
+npm run db:seed
+npm run dev
+
+Comandos de inspeccion:
+
+npm run db:studio
+npx prisma migrate status
+
+Para iniciar el conjunto completo:
+
+docker-compose up --build
+
+Para detener servicios sin eliminar datos:
+
+docker-compose down
+
+Para eliminar tambien el volumen de datos, solo en un entorno de
+desarrollo controlado:
+
+docker-compose down -v
+
+=====================================================================
+5. MODELO RELACIONAL
+=====================================================================
+
+5.1 Entidades
+
+ROLES
+- id_rol (PK)
+- nombre (UNIQUE)
+
+AREAS
+- id_area (PK)
+- nombre (UNIQUE)
+- activo
+
+CATEGORIAS
+- id_categoria (PK)
+- nombre (UNIQUE)
+- descripcion
+- activo
+
+PRIORIDADES
+- id_prioridad (PK)
+- nombre (UNIQUE)
+
+ESTADOS
+- id_estado (PK)
+- nombre (UNIQUE)
+
+USUARIOS
+- id_usuario (PK)
+- id_rol (FK -> roles.id_rol)
+- id_area (FK -> areas.id_area)
+- nombre
+- correo (UNIQUE)
+- password_hash
+- activo
+- creado_en
+
+TICKETS
+- id_ticket (PK)
+- folio (UNIQUE)
+- id_solicitante (FK -> usuarios.id_usuario)
+- id_responsable (FK opcional -> usuarios.id_usuario)
+- id_area (FK -> areas.id_area)
+- id_categoria (FK -> categorias.id_categoria)
+- id_prioridad (FK -> prioridades.id_prioridad)
+- id_estado (FK -> estados.id_estado)
+- titulo
+- descripcion
+- fecha_creacion
+- fecha_actualizacion
+- fecha_cierre opcional
+
+COMENTARIOS
+- id_comentario (PK)
+- id_ticket (FK -> tickets.id_ticket)
+- id_usuario (FK -> usuarios.id_usuario)
+- comentario
+- fecha
+
+ADJUNTOS
+- id_adjunto (PK)
+- id_ticket (FK -> tickets.id_ticket)
+- id_usuario (FK -> usuarios.id_usuario)
+- nombre_archivo
+- ruta_archivo
+- tipo_mime
+- fecha
+
+HISTORIAL_TICKETS
+- id_historial (PK)
+- id_ticket (FK -> tickets.id_ticket)
+- id_usuario (FK -> usuarios.id_usuario)
+- accion
+- valor_anterior
+- valor_nuevo
+- fecha
+
+NOTIFICACIONES
+- id_notificacion (PK)
+- id_usuario (FK -> usuarios.id_usuario)
+- id_ticket (FK -> tickets.id_ticket)
+- titulo
+- mensaje
+- tipo
+- leido
+- fecha_creacion
+- fecha_lectura
+
+5.2 Relaciones
+
+ROLES 1 ---- N USUARIOS
+AREAS 1 ---- N USUARIOS
+USUARIOS 1 ---- N TICKETS como solicitante
+USUARIOS 1 ---- N TICKETS como responsable
+AREAS 1 ---- N TICKETS
+CATEGORIAS 1 ---- N TICKETS
+PRIORIDADES 1 ---- N TICKETS
+ESTADOS 1 ---- N TICKETS
+TICKETS 1 ---- N COMENTARIOS
+USUARIOS 1 ---- N COMENTARIOS
+TICKETS 1 ---- N ADJUNTOS
+USUARIOS 1 ---- N ADJUNTOS
+TICKETS 1 ---- N HISTORIAL_TICKETS
+USUARIOS 1 ---- N HISTORIAL_TICKETS
+USUARIOS 1 ---- N NOTIFICACIONES
+TICKETS 1 ---- N NOTIFICACIONES
+
+5.3 Diagrama relacional simplificado
+
+ [ROLES]       [AREAS]       [CATEGORIAS]
+     |            |                |
+     +------ [USUARIOS]            |
+                |                  |
+                | solicitante /    |
+                | responsable      |
+                v                  v
+          +------------- [TICKETS] <---- [PRIORIDADES]
+          |              /  |  \
+          |             /   |   \------ [ESTADOS]
+          v            v    v
+   [COMENTARIOS] [ADJUNTOS] [HISTORIAL_TICKETS]
+          ^            ^             ^
+          |            |             |
+       USUARIOS     USUARIOS      USUARIOS
+
+                         [NOTIFICACIONES]
+                          ^           ^
+                          |           |
+                       USUARIOS    TICKETS
+
+5.4 Integridad y rendimiento
+
+- Las claves primarias son enteros autoincrementales.
+- Los nombres de catalogos y el correo de usuario son unicos.
+- Las relaciones de catalogo restringen eliminaciones invalidas.
+- La eliminacion de un ticket elimina sus comentarios, adjuntos,
+  historial y notificaciones dependientes cuando corresponde.
+- Se definieron indices para solicitante, responsable, area,
+  categoria, prioridad, estado, folio y campos de consulta frecuente.
+
+=====================================================================
+6. DISENO GRAFICO
+=====================================================================
+
+El frontend utiliza una interfaz administrativa responsive, con
+componentes compartidos para conservar consistencia entre roles.
+
+Elementos visuales implementados:
+
+- Barra lateral o navegacion contextual por rol.
+- Encabezado con informacion de sesion y acciones.
+- Tarjetas de estadisticas para los dashboards.
+- Tablas y tarjetas para visualizar tickets.
+- Badges para representar estado y prioridad.
+- Formularios para autenticacion, tickets, usuarios, areas y
+  categorias.
+- Estados visuales de carga, error y contenido vacio.
+- Tema claro y modo oscuro.
+- Diseño adaptable para movil, tablet y escritorio.
+
+Estructura visual general:
+
++---------------------------------------------------------------+
+| Logo SITTI | Titulo de pantalla             Usuario | Salir   |
++----------------------+----------------------------------------+
+| Navegacion por rol   | Contenido principal                    |
+| - Dashboard          |                                        |
+| - Tickets            | Tarjetas / filtros / tabla / detalle  |
+| - Notificaciones     |                                        |
+| - Perfil             |                                        |
++----------------------+----------------------------------------+
+
+La implementacion visual se apoya principalmente en:
+
+- app/components/common/
+- app/components/dashboard/
+- app/components/tickets/
+- app/components/layout/
+- app/app.css
+
+=====================================================================
+7. NAVEGABILIDAD
+=====================================================================
+
+La navegacion se organiza por rol y se declara en app/routes.ts.
+Las rutas de detalle utilizan el identificador del ticket.
+
+7.1 Acceso inicial
+
+/                       -> Pantalla de inicio de sesion
+
+7.2 Rutas de Usuario
+
+/usuario/dashboard
+/usuario/tickets
+/usuario/tickets/:id
+/usuario/tickets/nuevo
+/usuario/notificaciones
+/usuario/perfil
+
+7.3 Rutas de Tecnico
+
+/tecnico/dashboard
+/tecnico/asignados
+/tecnico/cola
+/tecnico/tickets/:id
+/tecnico/pendientes
+/tecnico/resueltos
+/tecnico/notificaciones
+/tecnico/perfil
+
+7.4 Rutas de Administrador
+
+/admin/dashboard
+/admin/tickets
+/admin/tickets/:id
+/admin/usuarios
+/admin/areas
+/admin/categorias
+/admin/reportes
+/admin/configuracion
+/admin/perfil
+
+7.5 Flujo de navegacion
+
+Inicio de sesion
+       |
+       v
+Validacion de credenciales
+       |
+       v
+JWT y datos del usuario
+       |
+       +--> Usuario -> Dashboard de usuario
+       |
+       +--> Tecnico -> Dashboard tecnico
+       |
+       +--> Administrador -> Dashboard administrativo
+
+Si el token no existe, es invalido o expiro, el usuario debe volver
+a iniciar sesion. El frontend conserva el token en
+localStorage["auth_token"] y lo envia como encabezado Bearer.
+
+=====================================================================
+8. DISENO DE REPORTES
+=====================================================================
+
+La interfaz contempla la ruta administrativa:
+
+/admin/reportes
+
+El objetivo de esta vista es presentar informacion agrupada para
+apoyar la toma de decisiones, por ejemplo:
+
+- Total de tickets.
+- Tickets abiertos, asignados, en proceso, pendientes, resueltos y
+  cerrados.
+- Tickets por prioridad.
+- Tickets por area.
+- Tickets por categoria.
+- Tickets por tecnico responsable.
+- Evolucion de tickets en el tiempo.
+
+Elementos visuales disponibles en el frontend:
+
+- Tarjetas de resumen.
+- Graficas de tickets por estado.
+- Graficas de tickets por prioridad.
+- Filtros por estado, prioridad, area y periodo.
+- Tablas de detalle.
+
+Estado de integracion identificado en el codigo:
+
+- La ruta y los servicios de reportes existen en el frontend.
+- Existe estructura de controller y service para reportes en el
+  backend, pero actualmente se encuentran sin implementacion efectiva.
+- app/src no es la ruta del frontend; las rutas reales estan en
+  app/routes/.
+- backend/src/app.ts actualmente monta auth, tickets, comentarios,
+  notificaciones y usuarios. Las rutas especificas de reportes,
+  areas y categorias deben montarse en Express para completar la
+  integracion.
+
+Recomendacion para completar esta parte:
+
+1. Implementar consultas agregadas en reports.service.ts.
+2. Implementar los controladores de reportes.
+3. Registrar reports.routes.ts en backend/src/app.ts.
+4. Conectar app/services/reports.service.ts con los endpoints reales.
+5. Agregar filtros y validar resultados contra PostgreSQL.
+
+=====================================================================
+9. DESARROLLO DE LA BASE DE DATOS
+=====================================================================
+
+El desarrollo de la base de datos se realiza con Prisma ORM y
+PostgreSQL.
+
+Archivos principales:
+
+- backend/prisma/schema.prisma
+- backend/prisma/seed.ts
+- backend/prisma/migrations/20260906001001_initial/migration.sql
+- backend/prisma/migrations/20260908163347_add_notifications/migration.sql
+- backend/src/config/database.ts
+
+Proceso:
+
+1. Se definen modelos y relaciones en schema.prisma.
+2. Prisma genera el cliente TypeScript.
+3. Las migraciones crean o modifican las tablas.
+4. El seed carga catalogos y datos iniciales.
+5. El backend valida la conexion al arrancar.
+
+La conexion se prueba en backend/src/server.ts mediante
+prisma.$connect(). Si la conexion falla, el backend no inicia y
+registra el error.
+
+=====================================================================
+10. DESARROLLO DEL BACKEND
+=====================================================================
+
+El backend sigue una separacion por capas:
+
+- Routes: define verbo HTTP y ruta.
+- Middleware: autentica, autoriza, procesa errores y archivos.
+- Controllers: traduce la solicitud a una respuesta HTTP.
+- Services: concentra la logica de negocio y persistencia.
+- Validators: valida payloads con Zod.
+- Utils: JWT, contrasenas y generacion de folios.
+
+Endpoints principales actualmente registrados:
+
+AUTENTICACION
+POST /auth/register       Registrar usuario
+POST /auth/login          Iniciar sesion
+GET  /auth/me             Consultar usuario autenticado
+
+TICKETS
+GET    /tickets           Listar tickets
+GET    /tickets/my-tickets Consultar tickets propios
+GET    /tickets/:id       Consultar detalle
+POST   /tickets           Crear ticket
+PUT    /tickets/:id       Actualizar ticket
+DELETE /tickets/:id       Eliminar ticket
+
+SISTEMA
+GET /                    Informacion de la API
+GET /health              Estado del backend
+
+OTROS RECURSOS REGISTRADOS
+/api/comentarios
+/api/notificaciones
+/api/users
+
+Puerto por defecto: 3000
+Servidor de desarrollo: tsx watch src/server.ts
+Compilacion: tsc
+
+=====================================================================
+11. AUTENTICACION Y AUTORIZACION
+=====================================================================
+
+11.1 Autenticacion
+
+1. El usuario envia correo y contrasena a POST /auth/login.
+2. El backend busca el usuario por correo.
+3. bcrypt compara la contrasena recibida con password_hash.
+4. Si es valida, se genera un JWT.
+5. El backend devuelve token y datos basicos del usuario.
+6. El frontend almacena el token en localStorage.
+7. Cada solicitud protegida envia:
+
+Authorization: Bearer <token>
+
+11.2 Persistencia de sesion
+
+Al cargar la aplicacion:
+
+1. AuthContext busca auth_token.
+2. Si existe, configura el cliente API.
+3. Solicita GET /auth/me.
+4. Si el token es valido, restaura el usuario.
+5. Si es invalido o expiro, limpia el token y muestra login.
+
+11.3 Autorizacion
+
+- El frontend organiza las vistas por rol para la experiencia de
+  usuario.
+- El backend utiliza middleware de autenticacion y middleware de
+  roles para proteger operaciones.
+- Las operaciones sensibles deben validar siempre el rol en backend;
+  ocultar una opcion en frontend no sustituye la autorizacion.
+
+11.4 Medidas de seguridad
+
+- Contrasenas almacenadas como hash bcrypt.
+- Tokens JWT con expiracion configurada.
+- CORS restringido a origenes locales de desarrollo.
+- Variables sensibles fuera del codigo fuente.
+- Validacion de entrada con esquemas.
+- Separacion de responsabilidades por middleware.
+
+Para produccion se recomienda:
+
+- Cambiar secretos y credenciales de desarrollo.
+- Usar HTTPS.
+- Rotar JWT_SECRET.
+- Configurar CORS con dominios reales.
+- Aplicar limites de solicitudes.
+- Definir almacenamiento seguro para adjuntos.
+- No usar contrasenas incluidas en ejemplos.
+
+=====================================================================
+12. GESTION DE TICKETS
+=====================================================================
+
+12.1 Creacion
+
+El usuario proporciona:
+
+- Titulo.
+- Descripcion.
+- Area.
+- Categoria.
+- Prioridad.
+
+El backend completa:
+
+- Solicitante desde el JWT.
+- Folio unico.
+- Estado inicial.
+- Fecha de creacion.
+- Fecha de actualizacion.
+
+12.2 Asignacion y atencion
+
+1. El ticket aparece en la cola.
+2. Un tecnico o administrador puede asignarlo.
+3. El responsable actualiza estado y prioridad cuando corresponde.
+4. Los cambios pueden reflejarse en historial y notificaciones.
+5. Al resolver o cerrar, se registra la fecha correspondiente.
+
+12.3 Consulta
+
+- Un usuario consulta sus propios tickets.
+- Un tecnico consulta su trabajo y la cola operativa.
+- Un administrador consulta el universo de tickets.
+- El detalle incluye relaciones de solicitante, responsable, area,
+  categoria, prioridad y estado.
+
+12.4 Operaciones soportadas por el servicio frontend
+
+- Listar todos los tickets.
+- Listar tickets propios.
+- Consultar un ticket.
+- Crear un ticket.
+- Actualizar un ticket.
+- Eliminar un ticket.
+
+=====================================================================
+13. DESARROLLO DEL FRONTEND
+=====================================================================
+
+El frontend esta construido con React y React Router. La configuracion
+de rutas separa las experiencias de los tres roles sin duplicar el
+sistema de componentes.
+
+Componentes reutilizables destacados:
+
+- Button
+- Card
+- Badge
+- Alert
+- Loading
+- Navbar
+- Sidebar
+- AppShell
+- TicketCard
+- TicketTable
+- TicketForm
+- TicketStatusBadge
+- TicketPriorityBadge
+- StatCard
+
+Servicios frontend:
+
+- api.ts: cliente HTTP con manejo de token y errores.
+- auth.service.ts: login, registro, usuario actual y logout.
+- tickets.service.ts: operaciones CRUD de tickets.
+- notifications.service.ts: notificaciones.
+- users.service.ts: usuarios.
+- areas.service.ts: areas.
+- categories.service.ts: categorias.
+- reports.service.ts: reportes.
+
+Caracteristicas de interfaz:
+
+- TypeScript.
+- Diseño responsive.
+- Tema oscuro.
+- Mensajes de carga y error.
+- Formularios tipados.
+- Dashboards con estadisticas.
+- Navegacion contextual.
+
+=====================================================================
+14. INTEGRACION FRONTEND-BACKEND
+=====================================================================
+
+La integracion utiliza fetch y JSON.
+
+Configuracion:
+
+- API por defecto: http://localhost:3000
+- Variable opcional: VITE_API_URL
+- Frontend: http://localhost:5173
+
+Ejemplo conceptual:
+
+Frontend service
+      |
+      | api.post("/auth/login", datos)
+      v
+Express route
+      |
+      v
+Controller -> Service -> Prisma -> PostgreSQL
+      |
+      v
+JSON response
+      |
+      v
+React state / pantalla
+
+Errores:
+
+- Si la respuesta no es 2xx, ApiClient intenta leer error.error.
+- El servicio lanza una excepcion.
+- La pantalla debe mostrar el mensaje de error y conservar la
+  posibilidad de reintentar.
+
+Verificacion manual:
+
+curl http://localhost:3000/health
+
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"correo":"usuario.ventas@sitti.com","password":"password123"}'
+
+=====================================================================
+15. IMPLANTACION
+=====================================================================
+
+15.1 Requisitos
+
+- Node.js 18 o superior.
+- Docker 20.10 o superior para el despliegue recomendado.
+- Docker Compose 2 o superior.
+- PostgreSQL 12 o superior si se ejecuta sin Docker.
+- npm.
+
+15.2 Implantacion con Docker Compose
+
+1. Abrir una terminal en la raiz del proyecto.
+2. Ejecutar:
+
+docker-compose up --build
+
+3. Verificar:
+
+Frontend: http://localhost:5173
+Backend:  http://localhost:3000
+Health:   http://localhost:3000/health
+pgAdmin:  http://localhost:5050
+
+Los servicios definidos son:
+
+- postgres: base de datos.
+- pgadmin: administracion grafica de PostgreSQL.
+- backend: API Express.
+- frontend: aplicacion React.
+
+15.3 Implantacion manual
+
+Base de datos:
+
+1. Crear PostgreSQL y la base sitti_db.
+2. Configurar backend/.env.
+3. Ejecutar las migraciones y el seed.
+
+Backend:
+
+cd backend
+npm install
+npm run db:migrate:deploy
+npm run db:seed
+npm run dev
+
+Frontend, en otra terminal:
+
+npm install
+npm run dev
+
+15.4 Datos de demostracion
+
+El seed proporciona roles, catalogos, usuarios de prueba y tickets
+para validar el flujo de la aplicacion. Las contrasenas de demostracion
+solo deben utilizarse en desarrollo.
+
+=====================================================================
+16. PRUEBAS
+=====================================================================
+
+16.1 Pruebas de salud y conexion
+
+1. Confirmar que PostgreSQL esta disponible.
+2. Confirmar que el backend imprime:
+   Database connected successfully
+3. Ejecutar:
+
+curl http://localhost:3000/health
+
+Respuesta esperada:
+
+{
+  "status": "OK",
+  "timestamp": "..."
+}
+
+16.2 Pruebas de autenticacion
+
+- Login con credenciales validas.
+- Login con contrasena incorrecta.
+- Solicitud /auth/me con token valido.
+- Solicitud protegida sin token.
+- Solicitud con token invalido o expirado.
+- Persistencia de sesion despues de recargar el navegador.
+- Logout y limpieza de localStorage.
+
+16.3 Pruebas de tickets
+
+- Crear ticket con datos validos.
+- Rechazar datos obligatorios faltantes.
+- Listar todos los tickets.
+- Listar tickets del usuario autenticado.
+- Consultar un ticket existente.
+- Consultar un ticket inexistente.
+- Actualizar estado, prioridad o responsable.
+- Eliminar un ticket segun permisos.
+- Verificar folio unico.
+- Verificar relaciones con catalogos.
+
+16.4 Pruebas de interfaz
+
+- Acceder al dashboard de cada rol.
+- Verificar que la navegacion cambie segun el rol.
+- Verificar rutas de detalle.
+- Validar estados de carga y error.
+- Validar diseño movil, tablet y escritorio.
+- Validar modo oscuro.
+- Validar formularios y mensajes de validacion.
+
+16.5 Comandos de validacion
+
+Frontend:
+
+npm run typecheck
+npm run build
+
+Backend:
+
+cd backend
+npm run build
+npm run lint
+npm test
+
+La suite automatizada de backend se ejecuta mediante Vitest. Si no
+existen casos de prueba en el entorno actual, la validacion debe
+complementarse con las pruebas manuales descritas arriba.
+
+=====================================================================
+17. RESULTADOS
+=====================================================================
+
+Resultados implementados:
+
+- Sistema separado por roles Usuario, Tecnico y Administrador.
+- Frontend React con rutas organizadas por rol.
+- Backend Express con estructura por capas.
+- Conexion de Prisma con PostgreSQL.
+- Migraciones y seed para inicializar la base de datos.
+- Autenticacion JWT.
+- Contrasenas protegidas con bcrypt.
+- CRUD de tickets disponible.
+- Consulta de tickets propios y detalle de ticket.
+- Dashboards y vistas de seguimiento.
+- Notificaciones modeladas y con rutas de API.
+- Modelo relacional con historial, comentarios y adjuntos.
+- Ejecucion local mediante Docker Compose.
+- Cliente frontend preparado para consumir la API.
+
+Estado actual y pendientes de integracion:
+
+- La estructura visual de reportes existe en frontend.
+- La capa de reportes del backend requiere completar consultas,
+  controladores, rutas y conexion con la pantalla.
+- Las rutas de areas y categorias deben registrarse en app.ts si se
+  desea exponerlas por API desde el backend actual.
+- Debe ejecutarse una ronda de pruebas automatizadas y de aceptacion
+  con la base local antes de declarar el sistema listo para
+  produccion.
+- Deben reemplazarse credenciales y secretos de desarrollo antes de
+  cualquier despliegue publico.
+
+Conclusion:
+
+SITTI cuenta con una base tecnica funcional para la operacion local:
+frontend, backend, autenticacion, persistencia y gestion de tickets
+estan organizados e integrados. La principal actividad de cierre
+documentada es completar y validar la integracion de reportes,
+catalogos expuestos por API y la matriz formal de pruebas para
+produccion.
+
+=====================================================================
+18. REFERENCIAS INTERNAS DEL PROYECTO
+=====================================================================
+
+- README.md
+- backend/README.md
+- backend/prisma/schema.prisma
+- backend/prisma/seed.ts
+- backend/src/app.ts
+- backend/src/server.ts
+- backend/src/middleware/auth.middleware.ts
+- backend/src/routes/auth.routes.ts
+- backend/src/routes/tickets.routes.ts
+- app/routes.ts
+- app/context/AuthContext.tsx
+- app/services/api.ts
+- app/services/tickets.service.ts
+- docker-compose.yml
+- docs/data_conexion.md
+- docs/FLOWCHART.md
+- docs/VERIFICATION_REPORT.md
+
+FIN DEL DOCUMENTO

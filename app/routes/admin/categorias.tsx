@@ -1,15 +1,104 @@
 import type { Route } from "./+types/categorias";
-import { mockCategories } from "../../utils/mockData";
-import { Card, CardTitle } from "../../components/common/Card";
+import { Card } from "../../components/common/Card";
 import { Button } from "../../components/common/Button";
-import { useState } from "react";
+import {
+  categoriesService,
+  type CategoryItem,
+} from "../../services/categories.service";
+import { useAuth } from "../../context/AuthContext";
+import { useEffect, useState } from "react";
 
 export const meta: Route.MetaFunction = () => {
   return [{ title: "Categorías - SITTI" }];
 };
 
 export default function Categories() {
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editActive, setEditActive] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthLoading || !isAuthenticated) return;
+
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    categoriesService
+      .getCategories()
+      .then((response) => {
+        if (!cancelled) setCategories(response.categorias);
+      })
+      .catch((requestError) => {
+        if (!cancelled) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "No se pudieron cargar las categorías",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isAuthLoading]);
+
+  const startEditing = (category: CategoryItem) => {
+    setEditingId(category.id_categoria);
+    setEditName(category.nombre);
+    setEditDescription(category.descripcion || "");
+    setEditActive(category.activo);
+    setError(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditDescription("");
+    setEditActive(true);
+  };
+
+  const saveCategory = async (id: number) => {
+    if (!editName.trim()) {
+      setError("El nombre de la categoría es obligatorio");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await categoriesService.updateCategory(id, {
+        nombre: editName.trim(),
+        descripcion: editDescription.trim() || null,
+        activo: editActive,
+      });
+      setCategories((currentCategories) =>
+        currentCategories.map((category) =>
+          category.id_categoria === id ? response.categoria : category,
+        ),
+      );
+      cancelEditing();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo actualizar la categoría",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -20,64 +109,79 @@ export default function Categories() {
         <Button>Crear Categoría</Button>
       </div>
 
-      {/* Categories List */}
-      <div className="grid gap-4">
-        {mockCategories.map((category) => (
-          <Card key={category.id}>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  {category.name}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-3">
-                  {category.description}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  Área: {category.area}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    setEditingId(editingId === category.id ? null : category.id)
-                  }
-                >
-                  {editingId === category.id ? "Cancelar" : "Editar"}
-                </Button>
-                <Button variant="danger" size="sm">
-                  Eliminar
-                </Button>
-              </div>
-            </div>
+      {isLoading && (
+        <p className="text-gray-600 dark:text-gray-400">
+          Cargando categorías...
+        </p>
+      )}
+      {error && <p className="text-red-600 dark:text-red-400">{error}</p>}
+      {!isLoading && !error && categories.length === 0 && (
+        <p className="text-gray-600 dark:text-gray-400">
+          No hay categorías registradas en la base de datos.
+        </p>
+      )}
 
-            {editingId === category.id && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="space-y-3">
+      <div className="grid gap-4">
+        {categories.map((category) => (
+          <Card key={category.id_categoria}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                  {category.nombre}
+                </h3>
+                <p className="mb-3 text-gray-600 dark:text-gray-400">
+                  {category.descripcion || "Sin descripción"}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Estado: {category.activo ? "Activa" : "Inactiva"}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  editingId === category.id_categoria
+                    ? cancelEditing()
+                    : startEditing(category)
+                }
+              >
+                {editingId === category.id_categoria ? "Cancelar" : "Editar"}
+              </Button>
+            </div>
+            {editingId === category.id_categoria && (
+              <div className="mt-4 space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  placeholder="Nombre de la categoría"
+                  disabled={isSaving}
+                />
+                <textarea
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  placeholder="Descripción"
+                  rows={3}
+                  disabled={isSaving}
+                />
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <input
-                    type="text"
-                    defaultValue={category.name}
-                    placeholder="Nombre de la categoría"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    type="checkbox"
+                    checked={editActive}
+                    onChange={(event) => setEditActive(event.target.checked)}
+                    disabled={isSaving}
                   />
-                  <textarea
-                    defaultValue={category.description}
-                    placeholder="Descripción"
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  <select
-                    defaultValue={category.area}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Selecciona un área</option>
-                    <option value="area-1">Infraestructura</option>
-                    <option value="area-2">Aplicaciones</option>
-                    <option value="area-3">Soporte de Usuario</option>
-                  </select>
-                  <Button className="w-full">Guardar Cambios</Button>
-                </div>
+                  Categoría activa
+                </label>
+                <Button
+                  className="w-full"
+                  onClick={() => saveCategory(category.id_categoria)}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Guardando..." : "Guardar Cambios"}
+                </Button>
               </div>
             )}
           </Card>

@@ -13,7 +13,11 @@ async function main() {
   });
 
   // Obtener un ticket
-  const ticket = await prisma.ticket.findFirst();
+  const ticket = await prisma.ticket.findFirst({
+    include: {
+      area: true,
+    },
+  });
 
   if (!tecnicos.length || !ticket) {
     console.log("No hay técnicos o tickets para crear notificaciones");

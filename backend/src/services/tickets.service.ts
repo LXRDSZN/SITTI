@@ -10,9 +10,8 @@ export const getTickets = async (rol?: string, id_usuario?: number, id_area?: nu
   if (rolNormalized === 'usuario' && id_usuario) {
     // Usuario solo ve sus propios tickets
     where.id_solicitante = id_usuario;
-  } else if (rolNormalized === 'tecnico' && id_area) {
-    // Técnico ve tickets de su área
-    where.id_area = id_area;
+  } else if (rolNormalized === 'tecnico') {
+    // En la agencia actual, el técnico atiende tickets de todas las áreas.
   }
   // Admin ve todos (sin filtro)
 
@@ -64,38 +63,60 @@ export const createTicket = async (data: {
   id_categoria: number;
   id_prioridad: number;
 }) => {
-  // Generar folio automático
-  const lastTicket = await prisma.ticket.findFirst({
-    orderBy: { id_ticket: 'desc' },
-  });
-  const nextNumber = (lastTicket?.id_ticket || 0) + 1;
-  const folio = `TKT-${String(nextNumber).padStart(3, '0')}`;
-
   const estadoAbierto = await prisma.estado.findUnique({ where: { nombre: 'ABIERTO' } });
   
   if (!estadoAbierto) {
     throw new Error('Estado ABIERTO no existe');
   }
 
-  const ticket = await prisma.ticket.create({
-    data: {
-      folio,
-      titulo: data.titulo,
-      descripcion: data.descripcion,
-      id_solicitante: data.id_solicitante,
-      id_area: data.id_area,
-      id_categoria: data.id_categoria,
-      id_prioridad: data.id_prioridad,
-      id_estado: estadoAbierto.id_estado,
-    },
-    include: {
-      solicitante: { select: { id_usuario: true, nombre: true, correo: true } },
-      area: true,
-      categoria: true,
-      prioridad: true,
-      estado: true,
-    },
-  });
+  let ticket;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const existingFolios = await prisma.ticket.findMany({
+      select: { folio: true },
+    });
+    const highestFolio = existingFolios.reduce((highest, current) => {
+      const match = /^TKT-(\d+)$/.exec(current.folio);
+      return match ? Math.max(highest, Number(match[1])) : highest;
+    }, 0);
+    const folio = `TKT-${String(highestFolio + 1).padStart(3, '0')}`;
+
+    try {
+      ticket = await prisma.ticket.create({
+        data: {
+          folio,
+          titulo: data.titulo,
+          descripcion: data.descripcion,
+          id_solicitante: data.id_solicitante,
+          id_area: data.id_area,
+          id_categoria: data.id_categoria,
+          id_prioridad: data.id_prioridad,
+          id_estado: estadoAbierto.id_estado,
+        },
+        include: {
+          solicitante: { select: { id_usuario: true, nombre: true, correo: true } },
+          area: true,
+          categoria: true,
+          prioridad: true,
+          estado: true,
+        },
+      });
+      break;
+    } catch (error) {
+      const isUniqueFolioError =
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2002';
+
+      if (!isUniqueFolioError || attempt === 4) {
+        throw error;
+      }
+    }
+  }
+
+  if (!ticket) {
+    throw new Error('No se pudo generar un folio único para el ticket');
+  }
 
   // Crear notificaciones para todos los técnicos activos
   try {

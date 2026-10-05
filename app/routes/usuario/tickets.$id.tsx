@@ -7,6 +7,7 @@ import { Alert } from "../../components/common/Alert";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ticketsService, type Ticket } from "../../services/tickets.service";
+import { CommentsSection } from "../../components/tickets/CommentsSection";
 
 export const meta: Route.MetaFunction = ({ params }) => {
   return [{ title: `Ticket ${params.id} - SITTI` }];
@@ -18,7 +19,13 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    titulo: "",
+    descripcion: "",
+    id_prioridad: 0,
+  });
 
   useEffect(() => {
     const fetchTicket = async () => {
@@ -26,6 +33,11 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
         setLoading(true);
         const response = await ticketsService.getTicketById(parseInt(params.id));
         setTicket(response.ticket);
+        setFormData({
+          titulo: response.ticket.titulo,
+          descripcion: response.ticket.descripcion,
+          id_prioridad: response.ticket.prioridad.id_prioridad,
+        });
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al cargar el ticket");
@@ -39,6 +51,40 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
       fetchTicket();
     }
   }, [params.id, user]);
+
+  const canEdit = ticket?.estado.nombre === "ABIERTO";
+
+  const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!ticket) return;
+
+    try {
+      setSaving(true);
+      setError(null);
+      const response = await ticketsService.updateTicket(ticket.id_ticket, formData);
+      setTicket(response.ticket);
+      setIsEditing(false);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo actualizar el ticket",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (!ticket) return;
+    setFormData({
+      titulo: ticket.titulo,
+      descripcion: ticket.descripcion,
+      id_prioridad: ticket.prioridad.id_prioridad,
+    });
+    setError(null);
+    setIsEditing(false);
+  };
 
   if (loading) {
     return (
@@ -106,35 +152,67 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
         {/* Ticket Details */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
-            <CardTitle>Descripción</CardTitle>
-            <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-              {ticket.descripcion}
-            </p>
+            <CardTitle>{isEditing ? "Editar Ticket" : "Descripción"}</CardTitle>
+            {isEditing ? (
+              <form onSubmit={handleSave} className="space-y-4">
+                <input
+                  value={formData.titulo}
+                  onChange={(event) =>
+                    setFormData({ ...formData, titulo: event.target.value })
+                  }
+                  className="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="Título"
+                  required
+                />
+                <textarea
+                  value={formData.descripcion}
+                  onChange={(event) =>
+                    setFormData({ ...formData, descripcion: event.target.value })
+                  }
+                  className="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  rows={6}
+                  placeholder="Descripción"
+                  required
+                />
+                <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                  Prioridad
+                  <select
+                    value={formData.id_prioridad}
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        id_prioridad: Number(event.target.value),
+                      })
+                    }
+                    className="mt-1 w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value={1}>BAJA</option>
+                    <option value={2}>MEDIA</option>
+                    <option value={3}>ALTA</option>
+                  </select>
+                </label>
+                <div className="flex gap-3">
+                  <Button type="submit" disabled={saving}>
+                    {saving ? "Guardando..." : "Guardar Cambios"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleCancelEdit}
+                    disabled={saving}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                {ticket.descripcion}
+              </p>
+            )}
           </Card>
 
-          {/* Comments Section */}
-          <Card>
-            <CardTitle>Comentarios</CardTitle>
-            <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  No hay comentarios aún
-                </p>
-              </div>
-              <div>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Agrega un comentario..."
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={4}
-                />
-                <Button className="mt-3" disabled={!comment.trim()}>
-                  Comentar
-                </Button>
-              </div>
-            </div>
-          </Card>
+          <CommentsSection ticketId={ticket.id_ticket} />
         </div>
 
         {/* Sidebar */}
@@ -193,9 +271,16 @@ export default function TicketDetail({ params }: Route.ComponentProps) {
             </dl>
           </Card>
 
-          <Button className="w-full" variant="secondary" disabled>
-            Editar Ticket (Próximamente)
-          </Button>
+          {!isEditing && (
+            <Button
+              className="w-full"
+              variant="secondary"
+              onClick={() => setIsEditing(true)}
+              disabled={!canEdit}
+            >
+              {canEdit ? "Editar Ticket" : "Ticket no editable"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

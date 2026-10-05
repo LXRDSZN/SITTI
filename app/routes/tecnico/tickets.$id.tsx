@@ -7,6 +7,7 @@ import { Alert } from "../../components/common/Alert";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ticketsService, type Ticket } from "../../services/tickets.service";
+import { CommentsSection } from "../../components/tickets/CommentsSection";
 
 export const meta: Route.MetaFunction = ({ params }) => {
   return [{ title: `Ticket ${params.id} - SITTI` }];
@@ -18,9 +19,7 @@ export default function TechnicianTicketDetail({ params }: Route.ComponentProps)
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
   const [newStatus, setNewStatus] = useState<string>("");
-  const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
     const fetchTicket = async () => {
@@ -94,40 +93,6 @@ export default function TechnicianTicketDetail({ params }: Route.ComponentProps)
     }
   };
 
-  const handleAddComment = async () => {
-    if (!comment.trim() || !user) {
-      return;
-    }
-
-    try {
-      setSubmittingComment(true);
-      const response = await fetch('/api/comentarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id_ticket: ticket.id_ticket,
-          id_usuario: parseInt(user.id),
-          contenido: comment,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al guardar comentario');
-      }
-
-      // Limpiar textarea
-      setComment("");
-      
-      // Recargar ticket para ver comentarios
-      const ticketResponse = await ticketsService.getTicketById(ticket.id_ticket);
-      setTicket(ticketResponse.ticket);
-    } catch (err) {
-      console.error("Error al agregar comentario:", err);
-    } finally {
-      setSubmittingComment(false);
-    }
-  };
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -177,31 +142,11 @@ export default function TechnicianTicketDetail({ params }: Route.ComponentProps)
             </p>
           </Card>
 
-          {/* Work Area */}
-          <Card>
-            <CardTitle>Notas de Trabajo</CardTitle>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                  Agregar Comentario
-                </label>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Describe el trabajo realizado..."
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={4}
-                />
-                <Button 
-                  className="mt-3" 
-                  disabled={!comment.trim() || submittingComment}
-                  onClick={handleAddComment}
-                >
-                  {submittingComment ? "Guardando..." : "Agregar Comentario"}
-                </Button>
-              </div>
-            </div>
-          </Card>
+          <CommentsSection
+            ticketId={ticket.id_ticket}
+            title="Notas de Trabajo y Comentarios"
+            placeholder="Describe el trabajo realizado..."
+          />
 
           {/* Update Status */}
           <Card>

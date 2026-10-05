@@ -5,3 +5,6 @@
 # React Router
 /.react-router/
 /build/
+
+# Backend build artifacts
+/backend/dist/

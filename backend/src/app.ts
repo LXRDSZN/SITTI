@@ -6,6 +6,9 @@ import ticketsRoutes from './routes/tickets.routes.js';
 import comentariosRoutes from './routes/comentarios.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import usersRoutes from './routes/users.routes.js';
+import areasRoutes from './routes/areas.routes.js';
+import categoriesRoutes from './routes/categories.routes.js';
+import reportsRoutes from './routes/reports.routes.js';
 
 const app = express();
 
@@ -44,5 +47,8 @@ app.use('/tickets', ticketsRoutes);
 app.use('/api/comentarios', comentariosRoutes);
 app.use('/api/notificaciones', notificationsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/areas', areasRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/reports', reportsRoutes);
 
 export default app;

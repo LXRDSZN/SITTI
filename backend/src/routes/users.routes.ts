@@ -3,11 +3,12 @@ import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import prisma from '../config/database.js';
 import { hashPassword } from '../utils/password.js';
+import { requireRole } from '../middleware/role.middleware.js';
 
 const router = Router();
 
 // GET /api/users - Obtener todos los usuarios con su rol y área
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
+router.get('/', authMiddleware, requireRole('Administrador'), async (req: Request, res: Response) => {
   try {
     const usuarios = await prisma.usuario.findMany({
       include: {
@@ -25,6 +26,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         id_usuario: u.id_usuario,
         nombre: u.nombre,
         correo: u.correo,
+        telefono: u.telefono,
         id_rol: u.id_rol,
         rol: u.rol.nombre,
         id_area: u.id_area,
@@ -40,7 +42,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // GET /api/users/roles-areas - Obtener catálogo de roles y áreas para formularios
-router.get('/meta/roles-areas', authMiddleware, async (req: Request, res: Response) => {
+router.get('/meta/roles-areas', authMiddleware, requireRole('Administrador'), async (req: Request, res: Response) => {
   try {
     const roles = await prisma.rol.findMany();
     const areas = await prisma.area.findMany({ where: { activo: true } });
@@ -56,9 +58,9 @@ router.get('/meta/roles-areas', authMiddleware, async (req: Request, res: Respon
 });
 
 // POST /api/users - Crear un nuevo usuario
-router.post('/', authMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireRole('Administrador'), async (req: Request, res: Response) => {
   try {
-    const { nombre, correo, password, id_rol, id_area, activo } = req.body;
+    const { nombre, correo, telefono, password, id_rol, id_area, activo } = req.body;
 
     if (!nombre || !correo || !id_rol || !id_area) {
       return res.status(400).json({ success: false, error: 'Faltan campos requeridos (nombre, correo, id_rol, id_area)' });
@@ -76,6 +78,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       data: {
         nombre,
         correo,
+        telefono: typeof telefono === 'string' ? telefono.trim() || null : null,
         password_hash: passwordHash,
         id_rol: parseInt(id_rol),
         id_area: parseInt(id_area),
@@ -94,6 +97,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
         id_usuario: nuevoUsuario.id_usuario,
         nombre: nuevoUsuario.nombre,
         correo: nuevoUsuario.correo,
+        telefono: nuevoUsuario.telefono,
         id_rol: nuevoUsuario.id_rol,
         rol: nuevoUsuario.rol.nombre,
         id_area: nuevoUsuario.id_area,
@@ -112,9 +116,30 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
 router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { nombre, correo, password, id_rol, id_area, activo } = req.body;
+    const { nombre, correo, telefono, password, id_rol, id_area, activo } = req.body;
 
     const id_usuario = parseInt(id);
+
+    if (
+      !req.usuario ||
+      (req.usuario.id_usuario !== id_usuario &&
+        !(await prisma.usuario.findFirst({
+          where: {
+            id_usuario: req.usuario.id_usuario,
+            rol: { nombre: 'Administrador' },
+          },
+        })))
+    ) {
+      return res.status(403).json({ success: false, error: 'No tienes permisos para actualizar este usuario' });
+    }
+
+    const esPropioPerfil = req.usuario.id_usuario === id_usuario;
+    if (esPropioPerfil && (nombre !== undefined || id_rol !== undefined || id_area !== undefined || activo !== undefined || password !== undefined)) {
+      return res.status(400).json({
+        success: false,
+        error: 'En tu perfil solo puedes actualizar correo y teléfono',
+      });
+    }
 
     const usuarioExistente = await prisma.usuario.findUnique({ where: { id_usuario } });
     if (!usuarioExistente) {
@@ -124,6 +149,12 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
     const dataToUpdate: any = {};
     if (nombre !== undefined) dataToUpdate.nombre = nombre;
     if (correo !== undefined) dataToUpdate.correo = correo;
+    if (telefono !== undefined) {
+      if (telefono !== null && typeof telefono !== 'string') {
+        return res.status(400).json({ success: false, error: 'El teléfono no es válido' });
+      }
+      dataToUpdate.telefono = typeof telefono === 'string' ? telefono.trim() || null : null;
+    }
     if (id_rol !== undefined) dataToUpdate.id_rol = parseInt(id_rol);
     if (id_area !== undefined) dataToUpdate.id_area = parseInt(id_area);
     if (activo !== undefined) dataToUpdate.activo = Boolean(activo);
@@ -147,6 +178,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
         id_usuario: usuarioActualizado.id_usuario,
         nombre: usuarioActualizado.nombre,
         correo: usuarioActualizado.correo,
+        telefono: usuarioActualizado.telefono,
         id_rol: usuarioActualizado.id_rol,
         rol: usuarioActualizado.rol.nombre,
         id_area: usuarioActualizado.id_area,
@@ -162,7 +194,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // DELETE /api/users/:id - Eliminar o desactivar un usuario
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, requireRole('Administrador'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const id_usuario = parseInt(id);

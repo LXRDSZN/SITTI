@@ -6,6 +6,7 @@ export interface LoginResponse {
     id_usuario: number;
     nombre: string;
     correo: string;
+    telefono?: string | null;
     rol: string;
     id_area?: number;
     area: string;
@@ -16,6 +17,7 @@ export interface UserProfile {
   id_usuario: number;
   nombre: string;
   correo: string;
+  telefono?: string | null;
   rol: string;
   id_area?: number;
   area: string;

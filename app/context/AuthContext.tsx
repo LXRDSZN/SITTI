@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         department: usuario.area,
         area: usuario.area,
         id_area: usuario.id_area,
+        phone: usuario.telefono || "",
       };
 
       setAuthState({
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         department: resultado.usuario.area,
         area: resultado.usuario.area,
         id_area: resultado.usuario.id_area,
+        phone: resultado.usuario.telefono || "",
       };
 
       setAuthState({

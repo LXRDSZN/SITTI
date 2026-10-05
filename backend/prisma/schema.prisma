@@ -65,6 +65,7 @@ model Usuario {
   id_area          Int
   nombre           String
   correo           String             @unique
+  telefono         String?
   password_hash    String
   activo           Boolean            @default(true)
   creado_en        DateTime           @default(now())

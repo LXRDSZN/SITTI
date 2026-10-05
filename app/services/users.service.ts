@@ -4,6 +4,7 @@ export interface UserItem {
   id_usuario: number;
   nombre: string;
   correo: string;
+  telefono?: string | null;
   id_rol: number;
   rol: string;
   id_area: number;
@@ -46,6 +47,7 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   nombre?: string;
   correo?: string;
+  telefono?: string | null;
   password?: string;
   id_rol?: number;
   id_area?: number;

@@ -204,6 +204,15 @@ async function main() {
     const usuarioVentas = await prisma.usuario.findUnique({ where: { correo: 'usuario.ventas@sitti.com' } });
     const tecnicoSistemas = await prisma.usuario.findUnique({ where: { correo: 'tecnico.sistemas@sitti.com' } });
 
+    if (
+      !estadoAbierto || !estadoAsignado || !estadoEnProceso || !estadoResuelto ||
+      !prioridadAlta || !prioridadMedia || !prioridadBaja ||
+      !catHardware || !catSoftware || !catRedes ||
+      !usuarioVentas || !tecnicoSistemas
+    ) {
+      throw new Error('No se encontraron todos los catálogos y usuarios requeridos para crear los tickets');
+    }
+
     // TKT-001: Abierto - Usuario Ventas - Hardware
     await prisma.ticket.upsert({
       where: { folio: 'TKT-001' },
