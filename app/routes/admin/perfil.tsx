@@ -16,10 +16,16 @@ export default function AdminProfile() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("Perfil actualizado correctamente.");
   const [formData, setFormData] = useState({
     nombre: "",
     correo: "",
     telefono: "",
+  });
+  const [passwordData, setPasswordData] = useState({
+    actual: "",
+    nueva: "",
+    confirmar: "",
   });
 
   useEffect(() => {
@@ -38,6 +44,7 @@ export default function AdminProfile() {
     event.preventDefault();
     setError(null);
     setSuccess(false);
+    setSuccessMessage("Perfil actualizado correctamente.");
 
     if (!formData.correo.trim()) {
       setError("El email es obligatorio.");
@@ -81,6 +88,44 @@ export default function AdminProfile() {
     setIsEditing(true);
   };
 
+  const handlePasswordSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setSuccess(false);
+
+    if (!passwordData.actual || !passwordData.nueva || !passwordData.confirmar) {
+      setError("Completa todos los campos de contraseña.");
+      return;
+    }
+    if (passwordData.nueva.length < 8) {
+      setError("La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (passwordData.nueva !== passwordData.confirmar) {
+      setError("Las contraseñas nuevas no coinciden.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await usersService.updateUser(Number(user.id), {
+        password: passwordData.nueva,
+        currentPassword: passwordData.actual,
+      });
+      setPasswordData({ actual: "", nueva: "", confirmar: "" });
+      setSuccessMessage("Contraseña actualizada correctamente.");
+      setSuccess(true);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo cambiar la contraseña.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -100,7 +145,7 @@ export default function AdminProfile() {
         <Alert
           type="success"
           title="Éxito"
-          message="Perfil actualizado correctamente."
+          message={successMessage}
           onClose={() => setSuccess(false)}
         />
       )}
@@ -208,6 +253,45 @@ export default function AdminProfile() {
               </div>
             </form>
           </Card>
+
+          <Card>
+            <CardTitle>Cambiar Contraseña</CardTitle>
+            <form className="space-y-4" onSubmit={handlePasswordSubmit}>
+              <input
+                type="password"
+                placeholder="Contraseña actual"
+                value={passwordData.actual}
+                onChange={(event) =>
+                  setPasswordData((current) => ({ ...current, actual: event.target.value }))
+                }
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+              <input
+                type="password"
+                placeholder="Nueva contraseña (mínimo 8 caracteres)"
+                value={passwordData.nueva}
+                onChange={(event) =>
+                  setPasswordData((current) => ({ ...current, nueva: event.target.value }))
+                }
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+              <input
+                type="password"
+                placeholder="Confirmar nueva contraseña"
+                value={passwordData.confirmar}
+                onChange={(event) =>
+                  setPasswordData((current) => ({ ...current, confirmar: event.target.value }))
+                }
+                disabled={loading}
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+              <Button type="submit" disabled={loading}>
+                {loading ? "Guardando..." : "Cambiar Contraseña"}
+              </Button>
+            </form>
+          </Card>
         </div>
 
         {/* Admin Info */}
@@ -237,12 +321,6 @@ export default function AdminProfile() {
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 <span className="text-gray-700 dark:text-gray-300">
                   Ver reportes
-                </span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span className="text-gray-700 dark:text-gray-300">
-                  Configurar sistema
                 </span>
               </li>
               <li className="flex items-center gap-2">

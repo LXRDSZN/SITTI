@@ -154,9 +154,9 @@ async function main() {
     // Usuario TÉCNICO - Área Sistemas (resuelve tickets de TODAS las áreas)
     await prisma.usuario.upsert({
       where: { correo: 'tecnico.sistemas@sitti.com' },
-      update: { activo: true },
+      update: { nombre: 'Cesar Galicia', activo: true, password_hash: passwordHash },
       create: {
-        nombre: 'Carlos López (Técnico Sistemas)',
+        nombre: 'Cesar Galicia',
         correo: 'tecnico.sistemas@sitti.com',
         password_hash: passwordHash,
         id_rol: rolTecnico.id_rol,
@@ -168,9 +168,9 @@ async function main() {
     // Usuario ADMINISTRADOR - Área Sistemas
     await prisma.usuario.upsert({
       where: { correo: 'admin.sistemas@sitti.com' },
-      update: { activo: true },
+      update: { nombre: 'Esteban Urbina Cruz', activo: true, password_hash: passwordHash },
       create: {
-        nombre: 'Gerente Sistemas',
+        nombre: 'Esteban Urbina Cruz',
         correo: 'admin.sistemas@sitti.com',
         password_hash: passwordHash,
         id_rol: rolAdmin.id_rol,
@@ -181,8 +181,8 @@ async function main() {
 
     console.log('✓ Usuarios creados:');
     console.log('  - Usuario: usuario.ventas@sitti.com (Ventas)');
-    console.log('  - Técnico: tecnico.sistemas@sitti.com (Sistemas - resuelve todas las áreas)');
-    console.log('  - Admin: admin.sistemas@sitti.com (Sistemas - Gerente)');
+    console.log('  - Técnico: tecnico.sistemas@sitti.com (Cesar Galicia - Sistemas)');
+    console.log('  - Admin: admin.sistemas@sitti.com (Esteban Urbina Cruz - Sistemas)');
     console.log('  - Contraseña: password123');
 
     // Seed de Tickets

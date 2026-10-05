@@ -38,12 +38,13 @@ RUN apk add --no-cache openssl libc6-compat
 WORKDIR /app/backend
 
 COPY ./backend/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY ./backend/src ./src
 COPY ./backend/tsconfig.json ./
 COPY ./backend/prisma ./prisma
 
+RUN npx prisma generate
 RUN npm run build
 
 # ============================================
@@ -60,6 +61,7 @@ RUN npm ci --omit=dev
 
 COPY ./backend/prisma ./prisma
 COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend/node_modules/.prisma ./node_modules/.prisma
 
 EXPOSE 3000
 
